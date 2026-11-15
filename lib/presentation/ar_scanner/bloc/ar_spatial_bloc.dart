@@ -1,0 +1,365 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
+import '../../../core/services/ar_spatial_service.dart';
+import '../../../data/models/ar_measurement_model.dart';
+import '../../../data/repositories/ar_measurement_repository.dart';
+
+// EVENTS
+abstract class ArSpatialEvent {
+  const ArSpatialEvent();
+}
+
+class InitializeArSessionEvent extends ArSpatialEvent {
+  const InitializeArSessionEvent();
+}
+
+class PlaceCornerAnchorEvent extends ArSpatialEvent {
+  final Offset point;
+  const PlaceCornerAnchorEvent(this.point);
+}
+
+class ComputeRoomPolygonEvent extends ArSpatialEvent {
+  const ComputeRoomPolygonEvent();
+}
+
+class ResetSpatialAnchorsEvent extends ArSpatialEvent {
+  const ResetSpatialAnchorsEvent();
+}
+
+class TelemetryPacketReceivedEvent extends ArSpatialEvent {
+  final SpatialTelemetryPacket packet;
+  const TelemetryPacketReceivedEvent(this.packet);
+}
+
+class SaveRoomScanEvent extends ArSpatialEvent {
+  final String propertyId;
+  final String roomName;
+  const SaveRoomScanEvent({required this.propertyId, required this.roomName});
+}
+
+class LoadSavedScansEvent extends ArSpatialEvent {
+  const LoadSavedScansEvent();
+}
+
+// STATE
+class ArSpatialState {
+  final bool isSessionActive;
+  final double trackingConfidence;
+  final double ambientLux;
+  final double compassAzimuth;
+  final String solarExposureRating;
+  final double raycastDistanceMeters;
+  final List<Offset> anchors;
+  final List<double> wallLengthsFt;
+  final double areaSqFt;
+  final double areaSqMeters;
+  final double perimeterFt;
+  final double perimeterMeters;
+  final double paintCostEstimate;
+  final double flooringCostEstimate;
+  final bool isClosed;
+  final bool isSaved;
+  final List<ArMeasurementModel> savedScans;
+  final String? message;
+
+  const ArSpatialState({
+    required this.isSessionActive,
+    required this.trackingConfidence,
+    required this.ambientLux,
+    required this.compassAzimuth,
+    required this.solarExposureRating,
+    required this.raycastDistanceMeters,
+    required this.anchors,
+    required this.wallLengthsFt,
+    required this.areaSqFt,
+    required this.areaSqMeters,
+    required this.perimeterFt,
+    required this.perimeterMeters,
+    required this.paintCostEstimate,
+    required this.flooringCostEstimate,
+    required this.isClosed,
+    required this.isSaved,
+    required this.savedScans,
+    this.message,
+  });
+
+  factory ArSpatialState.initial() {
+    return const ArSpatialState(
+      isSessionActive: false,
+      trackingConfidence: 94.0,
+      ambientLux: 480.0,
+      compassAzimuth: 145.0,
+      solarExposureRating: 'OPTIMAL_SOUTH_EXPOSURE',
+      raycastDistanceMeters: 2.40,
+      anchors: [],
+      wallLengthsFt: [],
+      areaSqFt: 0.0,
+      areaSqMeters: 0.0,
+      perimeterFt: 0.0,
+      perimeterMeters: 0.0,
+      paintCostEstimate: 0.0,
+      flooringCostEstimate: 0.0,
+      isClosed: false,
+      isSaved: false,
+      savedScans: [],
+      message: null,
+    );
+  }
+
+  ArSpatialState copyWith({
+    bool? isSessionActive,
+    double? trackingConfidence,
+    double? ambientLux,
+    double? compassAzimuth,
+    String? solarExposureRating,
+    double? raycastDistanceMeters,
+    List<Offset>? anchors,
+    List<double>? wallLengthsFt,
+    double? areaSqFt,
+    double? areaSqMeters,
+    double? perimeterFt,
+    double? perimeterMeters,
+    double? paintCostEstimate,
+    double? flooringCostEstimate,
+    bool? isClosed,
+    bool? isSaved,
+    List<ArMeasurementModel>? savedScans,
+    String? message,
+  }) {
+    return ArSpatialState(
+      isSessionActive: isSessionActive ?? this.isSessionActive,
+      trackingConfidence: trackingConfidence ?? this.trackingConfidence,
+      ambientLux: ambientLux ?? this.ambientLux,
+      compassAzimuth: compassAzimuth ?? this.compassAzimuth,
+      solarExposureRating: solarExposureRating ?? this.solarExposureRating,
+      raycastDistanceMeters:
+          raycastDistanceMeters ?? this.raycastDistanceMeters,
+      anchors: anchors ?? this.anchors,
+      wallLengthsFt: wallLengthsFt ?? this.wallLengthsFt,
+      areaSqFt: areaSqFt ?? this.areaSqFt,
+      areaSqMeters: areaSqMeters ?? this.areaSqMeters,
+      perimeterFt: perimeterFt ?? this.perimeterFt,
+      perimeterMeters: perimeterMeters ?? this.perimeterMeters,
+      paintCostEstimate: paintCostEstimate ?? this.paintCostEstimate,
+      flooringCostEstimate: flooringCostEstimate ?? this.flooringCostEstimate,
+      isClosed: isClosed ?? this.isClosed,
+      isSaved: isSaved ?? this.isSaved,
+      savedScans: savedScans ?? this.savedScans,
+      message: message,
+    );
+  }
+}
+
+// BLOC
+class ArSpatialBloc extends Bloc<ArSpatialEvent, ArSpatialState> {
+  final ArSpatialService _service;
+  final ArMeasurementRepository _repository;
+  StreamSubscription<SpatialTelemetryPacket>? _telemetrySub;
+
+  ArSpatialBloc(this._service, this._repository)
+    : super(ArSpatialState.initial()) {
+    on<InitializeArSessionEvent>(_onInitializeArSession);
+    on<PlaceCornerAnchorEvent>(_onPlaceCornerAnchor);
+    on<ComputeRoomPolygonEvent>(_onComputeRoomPolygon);
+    on<ResetSpatialAnchorsEvent>(_onResetSpatialAnchors);
+    on<TelemetryPacketReceivedEvent>(_onTelemetryPacketReceived);
+    on<SaveRoomScanEvent>(_onSaveRoomScan);
+    on<LoadSavedScansEvent>(_onLoadSavedScans);
+  }
+
+  Future<void> _onInitializeArSession(
+    InitializeArSessionEvent event,
+    Emitter<ArSpatialState> emit,
+  ) async {
+    await _service.initializeArSession();
+    _telemetrySub?.cancel();
+    _telemetrySub = _service.streamSpatialTelemetry().listen((packet) {
+      add(TelemetryPacketReceivedEvent(packet));
+    });
+
+    final scans = await _repository.getMeasurements();
+
+    emit(
+      state.copyWith(
+        isSessionActive: true,
+        savedScans: scans,
+        message: 'Native AR Spatial Bridge Active (ARCore/ARKit)',
+      ),
+    );
+  }
+
+  Future<void> _onPlaceCornerAnchor(
+    PlaceCornerAnchorEvent event,
+    Emitter<ArSpatialState> emit,
+  ) async {
+    final updatedAnchors = List<Offset>.from(state.anchors)..add(event.point);
+    await _service.placeCornerAnchor(event.point.dx, event.point.dy, 0.0);
+
+    // Compute wall lengths & polygon
+    _recomputePolygonAndMetrics(updatedAnchors, emit);
+  }
+
+  Future<void> _onComputeRoomPolygon(
+    ComputeRoomPolygonEvent event,
+    Emitter<ArSpatialState> emit,
+  ) async {
+    _recomputePolygonAndMetrics(state.anchors, emit);
+  }
+
+  void _recomputePolygonAndMetrics(
+    List<Offset> anchors,
+    Emitter<ArSpatialState> emit,
+  ) {
+    if (anchors.isEmpty) {
+      emit(state.copyWith(anchors: []));
+      return;
+    }
+
+    final n = anchors.length;
+    final wallLengths = <double>[];
+    double perimeterPx = 0.0;
+
+    for (int i = 0; i < n; i++) {
+      final p1 = anchors[i];
+      final p2 = anchors[(i + 1) % n];
+      final dist = (p2 - p1).distance;
+      // Scale: 10 pixels = ~1.0 foot in viewport space
+      final distFt = dist / 10.0;
+      wallLengths.add(distFt);
+      perimeterPx += dist;
+    }
+
+    if (n >= 3) {
+      // Shoelace formula
+      double areaPx = 0.0;
+      for (int i = 0; i < n; i++) {
+        final p1 = anchors[i];
+        final p2 = anchors[(i + 1) % n];
+        areaPx += (p1.dx * p2.dy) - (p2.dx * p1.dy);
+      }
+      final areaSqFt = (areaPx.abs() / 2.0) / 100.0;
+      final areaSqM = areaSqFt / 10.7639;
+      final perimeterFt = perimeterPx / 10.0;
+      final perimeterM = perimeterFt / 3.28084;
+
+      // Cost estimates: Paint @ $1.50/sq.ft wall area (approx 10ft ceiling height), Flooring @ $12/sq.ft
+      final wallAreaSqFt = perimeterFt * 10.0;
+      final paintCost = wallAreaSqFt * 1.5;
+      final flooringCost = areaSqFt * 12.0;
+
+      emit(
+        state.copyWith(
+          anchors: anchors,
+          wallLengthsFt: wallLengths,
+          areaSqFt: areaSqFt,
+          areaSqMeters: areaSqM,
+          perimeterFt: perimeterFt,
+          perimeterMeters: perimeterM,
+          paintCostEstimate: paintCost,
+          flooringCostEstimate: flooringCost,
+          isClosed: true,
+        ),
+      );
+    } else {
+      emit(
+        state.copyWith(
+          anchors: anchors,
+          wallLengthsFt: wallLengths,
+          areaSqFt: 0.0,
+          areaSqMeters: 0.0,
+          perimeterFt: 0.0,
+          perimeterMeters: 0.0,
+          isClosed: false,
+        ),
+      );
+    }
+  }
+
+  Future<void> _onResetSpatialAnchors(
+    ResetSpatialAnchorsEvent event,
+    Emitter<ArSpatialState> emit,
+  ) async {
+    await _service.resetSpatialAnchors();
+    emit(
+      state.copyWith(
+        anchors: [],
+        wallLengthsFt: [],
+        areaSqFt: 0.0,
+        areaSqMeters: 0.0,
+        perimeterFt: 0.0,
+        perimeterMeters: 0.0,
+        paintCostEstimate: 0.0,
+        flooringCostEstimate: 0.0,
+        isClosed: false,
+        isSaved: false,
+        message: 'Spatial anchors cleared.',
+      ),
+    );
+  }
+
+  void _onTelemetryPacketReceived(
+    TelemetryPacketReceivedEvent event,
+    Emitter<ArSpatialState> emit,
+  ) {
+    emit(
+      state.copyWith(
+        trackingConfidence: event.packet.confidencePercent,
+        ambientLux: event.packet.ambientLux,
+        compassAzimuth: event.packet.compassAzimuth,
+        solarExposureRating: event.packet.solarExposureRating,
+        raycastDistanceMeters: event.packet.raycastDistanceMeters,
+      ),
+    );
+  }
+
+  Future<void> _onSaveRoomScan(
+    SaveRoomScanEvent event,
+    Emitter<ArSpatialState> emit,
+  ) async {
+    if (state.anchors.length < 3) return;
+
+    final scan = ArMeasurementModel(
+      id: 'scan-${DateTime.now().millisecondsSinceEpoch}',
+      propertyId: event.propertyId,
+      roomName: event.roomName,
+      points: state.anchors,
+      wallLengthsFt: state.wallLengthsFt,
+      areaSqFt: state.areaSqFt,
+      areaSqMeters: state.areaSqMeters,
+      perimeterFt: state.perimeterFt,
+      perimeterMeters: state.perimeterMeters,
+      paintCostEstimate: state.paintCostEstimate,
+      flooringCostEstimate: state.flooringCostEstimate,
+      solarExposure: state.solarExposureRating,
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+    );
+
+    await _repository.saveMeasurement(scan);
+    final updatedScans = await _repository.getMeasurements();
+
+    emit(
+      state.copyWith(
+        isSaved: true,
+        savedScans: updatedScans,
+        message: 'Floorplan scan saved successfully!',
+      ),
+    );
+  }
+
+  Future<void> _onLoadSavedScans(
+    LoadSavedScansEvent event,
+    Emitter<ArSpatialState> emit,
+  ) async {
+    final scans = await _repository.getMeasurements();
+    emit(state.copyWith(savedScans: scans));
+  }
+
+  @override
+  Future<void> close() {
+    _telemetrySub?.cancel();
+    return super.close();
+  }
+}
