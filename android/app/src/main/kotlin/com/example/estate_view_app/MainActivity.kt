@@ -12,11 +12,16 @@ import kotlin.math.sqrt
 class MainActivity : FlutterActivity() {
     private val methodChannelName = "com.safeer.estateview/ar_spatial"
     private val eventChannelName = "com.safeer.estateview/spatial_telemetry"
+    private val depthEventChannelName = "com.safeer.estateview/depth_point_cloud"
 
     private val anchors = mutableListOf<Map<String, Double>>()
     private var telemetryHandler: Handler? = null
     private var telemetryRunnable: Runnable? = null
     private var telemetryStep = 0
+
+    private var depthHandler: Handler? = null
+    private var depthRunnable: Runnable? = null
+    private var depthFrame = 0
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -148,6 +153,71 @@ class MainActivity : FlutterActivity() {
                     telemetryRunnable?.let { telemetryHandler?.removeCallbacks(it) }
                     telemetryHandler = null
                     telemetryRunnable = null
+                }
+            }
+        )
+
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, depthEventChannelName).setStreamHandler(
+            object : EventChannel.StreamHandler {
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                    depthHandler = Handler(Looper.getMainLooper())
+                    depthRunnable = object : Runnable {
+                        override fun run() {
+                            depthFrame++
+                            val pointsList = mutableListOf<Map<String, Double>>()
+
+                            // Generate realistic room enclosure point cloud (floor, walls, ceiling)
+                            val jitter = (depthFrame % 5) * 0.02
+                            // Floor grid (-2.5 to 2.5 on X and Z)
+                            for (ix in -4..4) {
+                                for (iz in -4..4) {
+                                    val x = ix * 0.6 + jitter
+                                    val z = iz * 0.6 + 2.5 + jitter
+                                    val y = -1.2 + ((ix * iz) % 3) * 0.01
+                                    val conf = 0.90 + ((ix + iz) % 5) * 0.02
+                                    pointsList.add(mapOf("x" to x, "y" to y, "z" to z, "confidence" to conf))
+                                }
+                            }
+
+                            // Wall vertical planes (left, back, right)
+                            for (iy in -2..4) {
+                                val y = iy * 0.45
+                                // Back wall (z = 5.0)
+                                for (ix in -4..4) {
+                                    val x = ix * 0.6
+                                    pointsList.add(mapOf("x" to x, "y" to y, "z" to 5.0 + jitter, "confidence" to 0.95))
+                                }
+                                // Left wall (x = -2.5)
+                                for (iz in 0..8) {
+                                    val z = iz * 0.6 + 0.5
+                                    pointsList.add(mapOf("x" to -2.5 + jitter, "y" to y, "z" to z, "confidence" to 0.92))
+                                }
+                                // Right wall (x = 2.5)
+                                for (iz in 0..8) {
+                                    val z = iz * 0.6 + 0.5
+                                    pointsList.add(mapOf("x" to 2.5 - jitter, "y" to y, "z" to z, "confidence" to 0.93))
+                                }
+                            }
+
+                            val packet = mapOf(
+                                "pointCount" to pointsList.size,
+                                "points" to pointsList,
+                                "minDepthMeters" to 0.8,
+                                "maxDepthMeters" to 5.5,
+                                "densityPointsPerSqMeter" to 42.0,
+                                "timestamp" to System.currentTimeMillis()
+                            )
+                            events?.success(packet)
+                            depthHandler?.postDelayed(this, 1200)
+                        }
+                    }
+                    depthHandler?.post(depthRunnable!!)
+                }
+
+                override fun onCancel(arguments: Any?) {
+                    depthRunnable?.let { depthHandler?.removeCallbacks(it) }
+                    depthHandler = null
+                    depthRunnable = null
                 }
             }
         )

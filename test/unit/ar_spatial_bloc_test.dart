@@ -5,6 +5,8 @@ import 'package:estate_view_app/presentation/ar_scanner/bloc/ar_spatial_bloc.dar
 import '../helpers/mock_repositories.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('ArSpatialBloc Unit Tests', () {
     late ArSpatialService service;
     late MockArMeasurementRepository repository;
@@ -93,5 +95,44 @@ void main() {
         expect(state.solarExposureRating, 'OPTIMAL_SOUTH_EXPOSURE');
       },
     );
+
+    test(
+      '5. ToggleLidarPointCloudEvent toggles point cloud streaming',
+      () async {
+        expect(bloc.state.isLidarActive, isFalse);
+
+        bloc.add(const ToggleLidarPointCloudEvent(true));
+        final activeState = await bloc.stream.first;
+        expect(activeState.isLidarActive, isTrue);
+
+        bloc.add(const ToggleLidarPointCloudEvent(false));
+        final inactiveState = await bloc.stream.first;
+        expect(inactiveState.isLidarActive, isFalse);
+      },
+    );
+
+    test('6. DepthPointsUpdatedEvent populates latestPointCloud', () async {
+      final packet = DepthPointCloudPacket(
+        pointCount: 3,
+        points: const [
+          LidarPoint3D(x: 1.0, y: 0.0, z: 2.0, confidence: 0.95),
+          LidarPoint3D(x: -1.0, y: 0.0, z: 2.0, confidence: 0.92),
+          LidarPoint3D(x: 0.0, y: 1.5, z: 3.0, confidence: 0.98),
+        ],
+        minDepthMeters: 1.2,
+        maxDepthMeters: 4.5,
+        densityPointsPerSqMeter: 38.0,
+        timestamp: DateTime.now(),
+      );
+
+      bloc.add(DepthPointsUpdatedEvent(packet));
+      final state = await bloc.stream.first;
+
+      expect(state.latestPointCloud, isNotNull);
+      expect(state.latestPointCloud!.pointCount, 3);
+      expect(state.latestPointCloud!.points.first.z, 2.0);
+      expect(state.latestPointCloud!.minDepthMeters, 1.2);
+      expect(state.latestPointCloud!.maxDepthMeters, 4.5);
+    });
   });
 }

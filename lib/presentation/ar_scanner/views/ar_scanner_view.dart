@@ -5,6 +5,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/utils/app_feedback.dart';
 import '../../discovery/bloc/property_catalog_bloc.dart';
 import '../bloc/ar_spatial_bloc.dart';
+import '../widgets/point_cloud_visualizer.dart';
 import '../widgets/solar_azimuth_gauge.dart';
 import '../widgets/spatial_viewport_canvas.dart';
 
@@ -206,67 +207,100 @@ class _ArScannerViewState extends State<ArScannerView> {
       children: [
         Column(
           children: [
-            // Spatial Viewport Canvas
+            // Spatial Viewport Canvas (2D Planar vs 3D LiDAR)
             Expanded(
               flex: 6,
               child: Stack(
                 children: [
-                  SpatialViewportCanvas(
-                    anchors: state.anchors,
-                    wallLengthsFt: state.wallLengthsFt,
-                    areaSqFt: state.areaSqFt,
-                    isClosed: state.isClosed,
-                    onTap: (point) {
-                      context.read<ArSpatialBloc>().add(
-                        PlaceCornerAnchorEvent(point),
-                      );
-                    },
-                  ),
-
-                  // Top Solar Azimuth Gauge HUD
-                  Positioned(
-                    top: 10,
-                    left: 12,
-                    right: 12,
-                    child: SolarAzimuthGauge(
-                      azimuthDegrees: state.compassAzimuth,
-                      exposureRating: state.solarExposureRating,
-                      ambientLux: state.ambientLux,
-                      confidencePercent: state.trackingConfidence,
+                  if (state.isLidarActive)
+                    PointCloudVisualizer(
+                      pointCloud: state.latestPointCloud,
+                      isStreaming: state.isLidarActive,
+                    )
+                  else ...[
+                    SpatialViewportCanvas(
+                      anchors: state.anchors,
+                      wallLengthsFt: state.wallLengthsFt,
+                      areaSqFt: state.areaSqFt,
+                      isClosed: state.isClosed,
+                      onTap: (point) {
+                        context.read<ArSpatialBloc>().add(
+                          PlaceCornerAnchorEvent(point),
+                        );
+                      },
                     ),
-                  ),
 
-                  // Raycast Distance Badge
+                    // Top Solar Azimuth Gauge HUD
+                    Positioned(
+                      top: 10,
+                      left: 12,
+                      right: 12,
+                      child: SolarAzimuthGauge(
+                        azimuthDegrees: state.compassAzimuth,
+                        exposureRating: state.solarExposureRating,
+                        ambientLux: state.ambientLux,
+                        confidencePercent: state.trackingConfidence,
+                      ),
+                    ),
+
+                    // Raycast Distance Badge
+                    Positioned(
+                      bottom: 12,
+                      left: 12,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: colors.surfaceContainer.withOpacity(0.9),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: colors.outlineVariant),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.straighten,
+                              size: 14,
+                              color: colors.secondary,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Raycast: ${state.raycastDistanceMeters.toStringAsFixed(2)}m',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: colors.onSurface,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+
+                  // 3D LiDAR vs 2D Planar Mode Switcher Button
                   Positioned(
                     bottom: 12,
-                    left: 12,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: colors.surfaceContainer.withOpacity(0.9),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: colors.outlineVariant),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.straighten,
-                            size: 14,
-                            color: colors.secondary,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Raycast: ${state.raycastDistanceMeters.toStringAsFixed(2)}m',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: colors.onSurface,
-                            ),
-                          ),
-                        ],
+                    right: 12,
+                    child: FloatingActionButton.small(
+                      heroTag: AppConstants.fabArToggleLidar,
+                      backgroundColor: state.isLidarActive
+                          ? colors.primary
+                          : colors.surfaceContainer,
+                      foregroundColor: state.isLidarActive
+                          ? colors.onPrimary
+                          : colors.onSurface,
+                      onPressed: () {
+                        context.read<ArSpatialBloc>().add(
+                          ToggleLidarPointCloudEvent(!state.isLidarActive),
+                        );
+                      },
+                      child: Icon(
+                        state.isLidarActive
+                            ? Icons.grid_view_outlined
+                            : Icons.view_in_ar_outlined,
+                        size: 20,
                       ),
                     ),
                   ),
@@ -418,31 +452,62 @@ class _ArScannerViewState extends State<ArScannerView> {
   ) {
     return Row(
       children: [
-        // Left Pane: Viewport Canvas
+        // Left Pane: Viewport Canvas (2D Planar vs 3D LiDAR)
         Expanded(
           flex: 6,
           child: Stack(
             children: [
-              SpatialViewportCanvas(
-                anchors: state.anchors,
-                wallLengthsFt: state.wallLengthsFt,
-                areaSqFt: state.areaSqFt,
-                isClosed: state.isClosed,
-                onTap: (point) {
-                  context.read<ArSpatialBloc>().add(
-                    PlaceCornerAnchorEvent(point),
-                  );
-                },
-              ),
+              if (state.isLidarActive)
+                PointCloudVisualizer(
+                  pointCloud: state.latestPointCloud,
+                  isStreaming: state.isLidarActive,
+                )
+              else ...[
+                SpatialViewportCanvas(
+                  anchors: state.anchors,
+                  wallLengthsFt: state.wallLengthsFt,
+                  areaSqFt: state.areaSqFt,
+                  isClosed: state.isClosed,
+                  onTap: (point) {
+                    context.read<ArSpatialBloc>().add(
+                      PlaceCornerAnchorEvent(point),
+                    );
+                  },
+                ),
+                Positioned(
+                  top: 8,
+                  left: 8,
+                  right: 8,
+                  child: SolarAzimuthGauge(
+                    azimuthDegrees: state.compassAzimuth,
+                    exposureRating: state.solarExposureRating,
+                    ambientLux: state.ambientLux,
+                    confidencePercent: state.trackingConfidence,
+                  ),
+                ),
+              ],
               Positioned(
-                top: 8,
-                left: 8,
+                bottom: 8,
                 right: 8,
-                child: SolarAzimuthGauge(
-                  azimuthDegrees: state.compassAzimuth,
-                  exposureRating: state.solarExposureRating,
-                  ambientLux: state.ambientLux,
-                  confidencePercent: state.trackingConfidence,
+                child: FloatingActionButton.small(
+                  heroTag: '${AppConstants.fabArToggleLidar}_landscape',
+                  backgroundColor: state.isLidarActive
+                      ? colors.primary
+                      : colors.surfaceContainer,
+                  foregroundColor: state.isLidarActive
+                      ? colors.onPrimary
+                      : colors.onSurface,
+                  onPressed: () {
+                    context.read<ArSpatialBloc>().add(
+                      ToggleLidarPointCloudEvent(!state.isLidarActive),
+                    );
+                  },
+                  child: Icon(
+                    state.isLidarActive
+                        ? Icons.grid_view_outlined
+                        : Icons.view_in_ar_outlined,
+                    size: 18,
+                  ),
                 ),
               ),
             ],

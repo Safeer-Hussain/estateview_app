@@ -11,12 +11,15 @@ class AppConstants {
   static const String fabAiConciergeClear = 'fab_ai_concierge_clear';
   static const String fabArReset = 'fab_ar_reset';
   static const String fabArSaveScan = 'fab_ar_save_scan';
+  static const String fabArToggleLidar = 'fab_ar_toggle_lidar';
 
   // Method Channels
   static const String arSpatialMethodChannel =
       'com.safeer.estateview/ar_spatial';
   static const String arSpatialEventChannel =
       'com.safeer.estateview/spatial_telemetry';
+  static const String arLidarDepthEventChannel =
+      'com.safeer.estateview/depth_point_cloud';
 
   // SharedPreferences Keys
   static const String prefThemeMode = 'estateview_theme_mode';

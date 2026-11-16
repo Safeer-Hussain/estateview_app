@@ -40,6 +40,71 @@ class SpatialTelemetryPacket {
   }
 }
 
+class LidarPoint3D {
+  final double x;
+  final double y;
+  final double z;
+  final double confidence;
+
+  const LidarPoint3D({
+    required this.x,
+    required this.y,
+    required this.z,
+    required this.confidence,
+  });
+
+  factory LidarPoint3D.fromMap(Map<dynamic, dynamic> map) {
+    return LidarPoint3D(
+      x: (map['x'] as num?)?.toDouble() ?? 0.0,
+      y: (map['y'] as num?)?.toDouble() ?? 0.0,
+      z: (map['z'] as num?)?.toDouble() ?? 0.0,
+      confidence: (map['confidence'] as num?)?.toDouble() ?? 0.9,
+    );
+  }
+}
+
+class DepthPointCloudPacket {
+  final int pointCount;
+  final List<LidarPoint3D> points;
+  final double minDepthMeters;
+  final double maxDepthMeters;
+  final double densityPointsPerSqMeter;
+  final DateTime timestamp;
+
+  const DepthPointCloudPacket({
+    required this.pointCount,
+    required this.points,
+    required this.minDepthMeters,
+    required this.maxDepthMeters,
+    required this.densityPointsPerSqMeter,
+    required this.timestamp,
+  });
+
+  factory DepthPointCloudPacket.fromMap(Map<dynamic, dynamic> map) {
+    final rawPoints = map['points'] as List<dynamic>? ?? [];
+    final parsed = rawPoints.map((p) {
+      if (p is Map) {
+        return LidarPoint3D.fromMap(p);
+      }
+      return const LidarPoint3D(x: 0, y: 0, z: 0, confidence: 0.9);
+    }).toList();
+
+    return DepthPointCloudPacket(
+      pointCount: (map['pointCount'] as num?)?.toInt() ?? parsed.length,
+      points: parsed,
+      minDepthMeters: (map['minDepthMeters'] as num?)?.toDouble() ?? 0.8,
+      maxDepthMeters: (map['maxDepthMeters'] as num?)?.toDouble() ?? 5.5,
+      densityPointsPerSqMeter:
+          (map['densityPointsPerSqMeter'] as num?)?.toDouble() ?? 42.0,
+      timestamp: map['timestamp'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(
+              (map['timestamp'] as num).toInt(),
+            )
+          : DateTime.now(),
+    );
+  }
+}
+
 class ArSpatialService {
   static const MethodChannel _methodChannel = MethodChannel(
     AppConstants.arSpatialMethodChannel,
@@ -47,10 +112,17 @@ class ArSpatialService {
   static const EventChannel _eventChannel = EventChannel(
     AppConstants.arSpatialEventChannel,
   );
+  static const EventChannel _depthEventChannel = EventChannel(
+    AppConstants.arLidarDepthEventChannel,
+  );
 
   StreamController<SpatialTelemetryPacket>? _fallbackController;
   Timer? _fallbackTimer;
   int _fallbackStep = 0;
+
+  StreamController<DepthPointCloudPacket>? _depthFallbackController;
+  Timer? _depthFallbackTimer;
+  int _depthFallbackStep = 0;
 
   Future<Map<String, dynamic>> initializeArSession() async {
     try {
@@ -222,8 +294,90 @@ class ArSpatialService {
     return _fallbackController!.stream;
   }
 
+  Stream<DepthPointCloudPacket> streamDepthPoints() {
+    try {
+      return _depthEventChannel
+          .receiveBroadcastStream()
+          .map((event) {
+            if (event is Map) {
+              return DepthPointCloudPacket.fromMap(event);
+            }
+            return _generateSamplePointCloud(0);
+          })
+          .handleError((_) {
+            return _createDepthFallbackStream();
+          });
+    } catch (_) {
+      return _createDepthFallbackStream();
+    }
+  }
+
+  Stream<DepthPointCloudPacket> _createDepthFallbackStream() {
+    _depthFallbackController?.close();
+    _depthFallbackTimer?.cancel();
+
+    _depthFallbackController =
+        StreamController<DepthPointCloudPacket>.broadcast();
+    _depthFallbackTimer = Timer.periodic(const Duration(milliseconds: 1200), (
+      timer,
+    ) {
+      _depthFallbackStep++;
+      _depthFallbackController?.add(
+        _generateSamplePointCloud(_depthFallbackStep),
+      );
+    });
+
+    return _depthFallbackController!.stream;
+  }
+
+  DepthPointCloudPacket _generateSamplePointCloud(int step) {
+    final jitter = (step % 5) * 0.02;
+    final points = <LidarPoint3D>[];
+
+    // Floor grid (-2.4 to 2.4 on X, 0.5 to 5.5 on Z, Y approx -1.2)
+    for (int ix = -4; ix <= 4; ix++) {
+      for (int iz = -4; iz <= 4; iz++) {
+        final x = ix * 0.6 + jitter;
+        final z = iz * 0.6 + 3.0 + jitter;
+        final y = -1.2 + ((ix * iz) % 3) * 0.01;
+        final conf = 0.90 + ((ix + iz).abs() % 5) * 0.02;
+        points.add(LidarPoint3D(x: x, y: y, z: z, confidence: conf));
+      }
+    }
+
+    // Vertical wall boundaries
+    for (int iy = -2; iy <= 4; iy++) {
+      final y = iy * 0.45;
+      // Back wall (z = 5.4)
+      for (int ix = -4; ix <= 4; ix++) {
+        points.add(
+          LidarPoint3D(x: ix * 0.6, y: y, z: 5.4 + jitter, confidence: 0.95),
+        );
+      }
+      // Left wall (x = -2.4) and Right wall (x = 2.4)
+      for (int iz = 0; iz <= 7; iz++) {
+        final z = iz * 0.6 + 0.8;
+        points.add(
+          LidarPoint3D(x: -2.4 + jitter, y: y, z: z, confidence: 0.92),
+        );
+        points.add(LidarPoint3D(x: 2.4 - jitter, y: y, z: z, confidence: 0.93));
+      }
+    }
+
+    return DepthPointCloudPacket(
+      pointCount: points.length,
+      points: points,
+      minDepthMeters: 0.8,
+      maxDepthMeters: 5.5,
+      densityPointsPerSqMeter: 42.0,
+      timestamp: DateTime.now(),
+    );
+  }
+
   void dispose() {
     _fallbackTimer?.cancel();
     _fallbackController?.close();
+    _depthFallbackTimer?.cancel();
+    _depthFallbackController?.close();
   }
 }

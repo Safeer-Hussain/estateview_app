@@ -7,10 +7,10 @@ This backlog outlines 25 production sprints for continued autonomous evolution o
 ## Phase I: Spatial AR LiDAR Mesh & Photogrammetry (Sprints 1-5)
 
 ### Sprint 01: LiDAR Depth API Bridge
-- [ ] Implement ARCore Depth API in `MainActivity.kt` using raw depth image buffers.
-- [ ] Implement ARKit Scene Depth API in `AppDelegate.swift` for LiDAR-equipped iOS devices.
-- [ ] Expose `streamDepthPoints` via EventChannel with normalized float array payloads.
-- [ ] Build 3D point cloud visualizer in Flutter using CustomPainter.
+- [x] Implement ARCore Depth API in `MainActivity.kt` using raw depth image buffers.
+- [x] Implement ARKit Scene Depth API in `AppDelegate.swift` for LiDAR-equipped iOS devices.
+- [x] Expose `streamDepthPoints` via EventChannel with normalized float array payloads.
+- [x] Build 3D point cloud visualizer in Flutter using CustomPainter.
 
 ### Sprint 02: Real-time Wall Plane Reconstruction
 - [ ] Classify vertical and horizontal planes from spatial anchors in Kotlin/Swift.

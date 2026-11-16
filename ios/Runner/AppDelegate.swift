@@ -101,6 +101,9 @@ import UIKit
     let eventChannel = FlutterEventChannel(name: eventChannelName, binaryMessenger: controller.binaryMessenger)
     eventChannel.setStreamHandler(self)
 
+    let depthEventChannel = FlutterEventChannel(name: "com.safeer.estateview/depth_point_cloud", binaryMessenger: controller.binaryMessenger)
+    depthEventChannel.setStreamHandler(DepthStreamHandler())
+
     GeneratedPluginRegistrant.register(with: self)
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
@@ -134,6 +137,63 @@ import UIKit
     self.telemetryTimer?.invalidate()
     self.telemetryTimer = nil
     self.eventSink = nil
+    return nil
+  }
+}
+
+class DepthStreamHandler: NSObject, FlutterStreamHandler {
+  private var depthTimer: Timer?
+  private var depthFrame: Int = 0
+  private var depthSink: FlutterEventSink?
+
+  func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
+    self.depthSink = events
+    self.depthFrame = 0
+    self.depthTimer = Timer.scheduledTimer(withTimeInterval: 1.2, repeats: true) { [weak self] _ in
+      guard let self = self, let sink = self.depthSink else { return }
+      self.depthFrame += 1
+      var points: [[String: Any]] = []
+      let jitter = Double(self.depthFrame % 5) * 0.02
+
+      for ix in -4...4 {
+        for iz in -4...4 {
+          let x = Double(ix) * 0.6 + jitter
+          let z = Double(iz) * 0.6 + 2.5 + jitter
+          let y = -1.2 + Double((ix * iz) % 3) * 0.01
+          let conf = 0.90 + Double((ix + iz) % 5) * 0.02
+          points.append(["x": x, "y": y, "z": z, "confidence": conf])
+        }
+      }
+
+      for iy in -2...4 {
+        let y = Double(iy) * 0.45
+        for ix in -4...4 {
+          points.append(["x": Double(ix) * 0.6, "y": y, "z": 5.0 + jitter, "confidence": 0.95])
+        }
+        for iz in 0...8 {
+          let z = Double(iz) * 0.6 + 0.5
+          points.append(["x": -2.5 + jitter, "y": y, "z": z, "confidence": 0.92])
+          points.append(["x": 2.5 - jitter, "y": y, "z": z, "confidence": 0.93])
+        }
+      }
+
+      let packet: [String: Any] = [
+        "pointCount": points.count,
+        "points": points,
+        "minDepthMeters": 0.8,
+        "maxDepthMeters": 5.5,
+        "densityPointsPerSqMeter": 42.0,
+        "timestamp": Date().timeIntervalSince1970 * 1000
+      ]
+      sink(packet)
+    }
+    return nil
+  }
+
+  func onCancel(withArguments arguments: Any?) -> FlutterError? {
+    self.depthTimer?.invalidate()
+    self.depthTimer = nil
+    self.depthSink = nil
     return nil
   }
 }

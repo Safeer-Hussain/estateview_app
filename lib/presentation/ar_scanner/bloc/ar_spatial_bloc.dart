@@ -44,6 +44,16 @@ class LoadSavedScansEvent extends ArSpatialEvent {
   const LoadSavedScansEvent();
 }
 
+class ToggleLidarPointCloudEvent extends ArSpatialEvent {
+  final bool enabled;
+  const ToggleLidarPointCloudEvent(this.enabled);
+}
+
+class DepthPointsUpdatedEvent extends ArSpatialEvent {
+  final DepthPointCloudPacket packet;
+  const DepthPointsUpdatedEvent(this.packet);
+}
+
 // STATE
 class ArSpatialState {
   final bool isSessionActive;
@@ -62,6 +72,8 @@ class ArSpatialState {
   final double flooringCostEstimate;
   final bool isClosed;
   final bool isSaved;
+  final bool isLidarActive;
+  final DepthPointCloudPacket? latestPointCloud;
   final List<ArMeasurementModel> savedScans;
   final String? message;
 
@@ -82,6 +94,8 @@ class ArSpatialState {
     required this.flooringCostEstimate,
     required this.isClosed,
     required this.isSaved,
+    required this.isLidarActive,
+    this.latestPointCloud,
     required this.savedScans,
     this.message,
   });
@@ -104,6 +118,8 @@ class ArSpatialState {
       flooringCostEstimate: 0.0,
       isClosed: false,
       isSaved: false,
+      isLidarActive: false,
+      latestPointCloud: null,
       savedScans: [],
       message: null,
     );
@@ -126,6 +142,8 @@ class ArSpatialState {
     double? flooringCostEstimate,
     bool? isClosed,
     bool? isSaved,
+    bool? isLidarActive,
+    DepthPointCloudPacket? latestPointCloud,
     List<ArMeasurementModel>? savedScans,
     String? message,
   }) {
@@ -147,6 +165,8 @@ class ArSpatialState {
       flooringCostEstimate: flooringCostEstimate ?? this.flooringCostEstimate,
       isClosed: isClosed ?? this.isClosed,
       isSaved: isSaved ?? this.isSaved,
+      isLidarActive: isLidarActive ?? this.isLidarActive,
+      latestPointCloud: latestPointCloud ?? this.latestPointCloud,
       savedScans: savedScans ?? this.savedScans,
       message: message,
     );
@@ -158,6 +178,7 @@ class ArSpatialBloc extends Bloc<ArSpatialEvent, ArSpatialState> {
   final ArSpatialService _service;
   final ArMeasurementRepository _repository;
   StreamSubscription<SpatialTelemetryPacket>? _telemetrySub;
+  StreamSubscription<DepthPointCloudPacket>? _depthSub;
 
   ArSpatialBloc(this._service, this._repository)
     : super(ArSpatialState.initial()) {
@@ -168,6 +189,42 @@ class ArSpatialBloc extends Bloc<ArSpatialEvent, ArSpatialState> {
     on<TelemetryPacketReceivedEvent>(_onTelemetryPacketReceived);
     on<SaveRoomScanEvent>(_onSaveRoomScan);
     on<LoadSavedScansEvent>(_onLoadSavedScans);
+    on<ToggleLidarPointCloudEvent>(_onToggleLidarPointCloud);
+    on<DepthPointsUpdatedEvent>(_onDepthPointsUpdated);
+  }
+
+  void _onToggleLidarPointCloud(
+    ToggleLidarPointCloudEvent event,
+    Emitter<ArSpatialState> emit,
+  ) {
+    if (event.enabled) {
+      _depthSub?.cancel();
+      _depthSub = _service.streamDepthPoints().listen((packet) {
+        add(DepthPointsUpdatedEvent(packet));
+      });
+      emit(
+        state.copyWith(
+          isLidarActive: true,
+          message: '3D LiDAR Depth Stream Active (Point Cloud Ingestion)',
+        ),
+      );
+    } else {
+      _depthSub?.cancel();
+      _depthSub = null;
+      emit(
+        state.copyWith(
+          isLidarActive: false,
+          message: 'Switched to 2D Planar Hotspot Studio',
+        ),
+      );
+    }
+  }
+
+  void _onDepthPointsUpdated(
+    DepthPointsUpdatedEvent event,
+    Emitter<ArSpatialState> emit,
+  ) {
+    emit(state.copyWith(latestPointCloud: event.packet));
   }
 
   Future<void> _onInitializeArSession(
@@ -360,6 +417,7 @@ class ArSpatialBloc extends Bloc<ArSpatialEvent, ArSpatialState> {
   @override
   Future<void> close() {
     _telemetrySub?.cancel();
+    _depthSub?.cancel();
     return super.close();
   }
 }
