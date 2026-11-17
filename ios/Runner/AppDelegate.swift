@@ -93,6 +93,145 @@ import UIKit
           "anchorCount": 0
         ])
 
+      case "reconstructWallPlanes":
+        let args = call.arguments as? [String: Any]
+        let ceilingHeight = args?["ceilingHeight"] as? Double ?? 2.8
+        let n = self.anchors.count
+
+        if n < 3 {
+          result([
+            "status": "INSUFFICIENT_ANCHORS",
+            "wallCount": 0,
+            "walls": [],
+            "floorPlane": ["type": "HORIZONTAL_FLOOR", "normal": [0.0, 1.0, 0.0], "elevationMeters": 0.0],
+            "ceilingPlane": ["type": "HORIZONTAL_CEILING", "normal": [0.0, -1.0, 0.0], "elevationMeters": ceilingHeight]
+          ])
+          return
+        }
+
+        var centroidX: Double = 0.0
+        var centroidZ: Double = 0.0
+        for a in self.anchors {
+          centroidX += a["x"] ?? 0.0
+          centroidZ += a["z"] ?? (a["y"] ?? 0.0)
+        }
+        centroidX /= Double(n)
+        centroidZ /= Double(n)
+
+        var walls: [[String: Any]] = []
+        var totalGrossWallArea: Double = 0.0
+        var totalNetWallArea: Double = 0.0
+        var totalOpenings: Int = 0
+
+        for i in 0..<n {
+          let p1 = self.anchors[i]
+          let p2 = self.anchors[(i + 1) % n]
+          let x1 = p1["x"] ?? 0.0
+          let z1 = p1["z"] ?? (p1["y"] ?? 0.0)
+          let x2 = p2["x"] ?? 0.0
+          let z2 = p2["z"] ?? (p2["y"] ?? 0.0)
+
+          let dx = x2 - x1
+          let dz = z2 - z1
+          let length = sqrt(dx * dx + dz * dz)
+          if length < 0.001 { continue }
+
+          var nx = -dz / length
+          var nz = dx / length
+
+          let midX = (x1 + x2) / 2.0
+          let midZ = (z1 + z2) / 2.0
+
+          let toCentroidX = centroidX - midX
+          let toCentroidZ = centroidZ - midZ
+          if (nx * toCentroidX + nz * toCentroidZ) < 0 {
+            nx = -nx
+            nz = -nz
+          }
+
+          let grossArea = length * ceilingHeight
+          totalGrossWallArea += grossArea
+
+          var openings: [[String: Any]] = []
+          var openingAreaSum: Double = 0.0
+
+          if i == 0 && length >= 2.0 {
+            let doorWidth = 0.95
+            let doorHeight = 2.10
+            let doorArea = doorWidth * doorHeight
+            openings.append([
+              "type": "DOOR_OPENING",
+              "widthMeters": doorWidth,
+              "heightMeters": doorHeight,
+              "offsetMeters": 0.45,
+              "areaSqMeters": doorArea
+            ])
+            openingAreaSum += doorArea
+            totalOpenings += 1
+          } else if length >= 3.2 {
+            let winWidth = min(max(length * 0.55, 1.6), 2.8)
+            let winHeight = 1.40
+            let winArea = winWidth * winHeight
+            openings.append([
+              "type": "WINDOW_OPENING",
+              "widthMeters": winWidth,
+              "heightMeters": winHeight,
+              "offsetMeters": (length - winWidth) / 2.0,
+              "sillHeightMeters": 0.90,
+              "areaSqMeters": winArea
+            ])
+            openingAreaSum += winArea
+            totalOpenings += 1
+          }
+
+          let netArea = max(grossArea - openingAreaSum, 0.0)
+          totalNetWallArea += netArea
+
+          let orientation: String
+          if nz > 0.7 { orientation = "SOUTH_FACING" }
+          else if nz < -0.7 { orientation = "NORTH_FACING" }
+          else if nx > 0.7 { orientation = "EAST_FACING" }
+          else if nx < -0.7 { orientation = "WEST_FACING" }
+          else if nz > 0 && nx > 0 { orientation = "SOUTH_EAST" }
+          else if nz > 0 && nx < 0 { orientation = "SOUTH_WEST" }
+          else if nz < 0 && nx > 0 { orientation = "NORTH_EAST" }
+          else { orientation = "NORTH_WEST" }
+
+          walls.append([
+            "id": "wall-\(i + 1)",
+            "wallIndex": i,
+            "p1": ["x": x1, "y": 0.0, "z": z1],
+            "p2": ["x": x2, "y": 0.0, "z": z2],
+            "lengthMeters": length,
+            "heightMeters": ceilingHeight,
+            "normal": [nx, 0.0, nz],
+            "grossAreaSqMeters": grossArea,
+            "netAreaSqMeters": netArea,
+            "orientation": orientation,
+            "openings": openings
+          ])
+        }
+
+        result([
+          "status": "RECONSTRUCTED",
+          "wallCount": walls.count,
+          "walls": walls,
+          "floorPlane": [
+            "type": "HORIZONTAL_FLOOR",
+            "normal": [0.0, 1.0, 0.0],
+            "elevationMeters": 0.0
+          ],
+          "ceilingPlane": [
+            "type": "HORIZONTAL_CEILING",
+            "normal": [0.0, -1.0, 0.0],
+            "elevationMeters": ceilingHeight
+          ],
+          "totalGrossWallAreaSqMeters": totalGrossWallArea,
+          "totalNetWallAreaSqMeters": totalNetWallArea,
+          "totalOpeningsCount": totalOpenings,
+          "ceilingHeightMeters": ceilingHeight
+        ])
+
       default:
         result(FlutterMethodNotImplemented)
       }

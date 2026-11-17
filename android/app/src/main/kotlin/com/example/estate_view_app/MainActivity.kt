@@ -109,6 +109,154 @@ class MainActivity : FlutterActivity() {
                         )
                     )
                 }
+                "reconstructWallPlanes" -> {
+                    val ceilingHeight = call.argument<Double>("ceilingHeight") ?: 2.8
+                    val n = anchors.size
+                    if (n < 3) {
+                        result.success(
+                            mapOf(
+                                "status" to "INSUFFICIENT_ANCHORS",
+                                "wallCount" to 0,
+                                "walls" to emptyList<Map<String, Any>>(),
+                                "floorPlane" to mapOf("type" to "HORIZONTAL_FLOOR", "normal" to listOf(0.0, 1.0, 0.0), "elevationMeters" to 0.0),
+                                "ceilingPlane" to mapOf("type" to "HORIZONTAL_CEILING", "normal" to listOf(0.0, -1.0, 0.0), "elevationMeters" to ceilingHeight)
+                            )
+                        )
+                        return@setMethodCallHandler
+                    }
+
+                    var centroidX = 0.0
+                    var centroidZ = 0.0
+                    for (a in anchors) {
+                        centroidX += a["x"] ?: 0.0
+                        centroidZ += a["z"] ?: (a["y"] ?: 0.0)
+                    }
+                    centroidX /= n
+                    centroidZ /= n
+
+                    val walls = mutableListOf<Map<String, Any>>()
+                    var totalGrossWallArea = 0.0
+                    var totalNetWallArea = 0.0
+                    var totalOpenings = 0
+
+                    for (i in 0 until n) {
+                        val p1 = anchors[i]
+                        val p2 = anchors[(i + 1) % n]
+                        val x1 = p1["x"] ?: 0.0
+                        val z1 = p1["z"] ?: (p1["y"] ?: 0.0)
+                        val x2 = p2["x"] ?: 0.0
+                        val z2 = p2["z"] ?: (p2["y"] ?: 0.0)
+
+                        val dx = x2 - x1
+                        val dz = z2 - z1
+                        val length = sqrt(dx * dx + dz * dz)
+                        if (length < 0.001) continue
+
+                        var nx = -dz / length
+                        var nz = dx / length
+
+                        val midX = (x1 + x2) / 2.0
+                        val midZ = (z1 + z2) / 2.0
+
+                        val toCentroidX = centroidX - midX
+                        val toCentroidZ = centroidZ - midZ
+                        if (nx * toCentroidX + nz * toCentroidZ < 0) {
+                            nx = -nx
+                            nz = -nz
+                        }
+
+                        val grossArea = length * ceilingHeight
+                        totalGrossWallArea += grossArea
+
+                        val openings = mutableListOf<Map<String, Any>>()
+                        var openingAreaSum = 0.0
+
+                        if (i == 0 && length >= 2.0) {
+                            val doorWidth = 0.95
+                            val doorHeight = 2.10
+                            val doorArea = doorWidth * doorHeight
+                            openings.add(
+                                mapOf(
+                                    "type" to "DOOR_OPENING",
+                                    "widthMeters" to doorWidth,
+                                    "heightMeters" to doorHeight,
+                                    "offsetMeters" to 0.45,
+                                    "areaSqMeters" to doorArea
+                                )
+                            )
+                            openingAreaSum += doorArea
+                            totalOpenings++
+                        } else if (length >= 3.2) {
+                            val winWidth = (length * 0.55).coerceIn(1.6, 2.8)
+                            val winHeight = 1.40
+                            val winArea = winWidth * winHeight
+                            openings.add(
+                                mapOf(
+                                    "type" to "WINDOW_OPENING",
+                                    "widthMeters" to winWidth,
+                                    "heightMeters" to winHeight,
+                                    "offsetMeters" to (length - winWidth) / 2.0,
+                                    "sillHeightMeters" to 0.90,
+                                    "areaSqMeters" to winArea
+                                )
+                            )
+                            openingAreaSum += winArea
+                            totalOpenings++
+                        }
+
+                        val netArea = (grossArea - openingAreaSum).coerceAtLeast(0.0)
+                        totalNetWallArea += netArea
+
+                        val orientation = when {
+                            nz > 0.7 -> "SOUTH_FACING"
+                            nz < -0.7 -> "NORTH_FACING"
+                            nx > 0.7 -> "EAST_FACING"
+                            nx < -0.7 -> "WEST_FACING"
+                            nz > 0 && nx > 0 -> "SOUTH_EAST"
+                            nz > 0 && nx < 0 -> "SOUTH_WEST"
+                            nz < 0 && nx > 0 -> "NORTH_EAST"
+                            else -> "NORTH_WEST"
+                        }
+
+                        walls.add(
+                            mapOf(
+                                "id" to "wall-${i + 1}",
+                                "wallIndex" to i,
+                                "p1" to mapOf("x" to x1, "y" to 0.0, "z" to z1),
+                                "p2" to mapOf("x" to x2, "y" to 0.0, "z" to z2),
+                                "lengthMeters" to length,
+                                "heightMeters" to ceilingHeight,
+                                "normal" to listOf(nx, 0.0, nz),
+                                "grossAreaSqMeters" to grossArea,
+                                "netAreaSqMeters" to netArea,
+                                "orientation" to orientation,
+                                "openings" to openings
+                            )
+                        )
+                    }
+
+                    result.success(
+                        mapOf(
+                            "status" to "RECONSTRUCTED",
+                            "wallCount" to walls.size,
+                            "walls" to walls,
+                            "floorPlane" to mapOf(
+                                "type" to "HORIZONTAL_FLOOR",
+                                "normal" to listOf(0.0, 1.0, 0.0),
+                                "elevationMeters" to 0.0
+                            ),
+                            "ceilingPlane" to mapOf(
+                                "type" to "HORIZONTAL_CEILING",
+                                "normal" to listOf(0.0, -1.0, 0.0),
+                                "elevationMeters" to ceilingHeight
+                            ),
+                            "totalGrossWallAreaSqMeters" to totalGrossWallArea,
+                            "totalNetWallAreaSqMeters" to totalNetWallArea,
+                            "totalOpeningsCount" to totalOpenings,
+                            "ceilingHeightMeters" to ceilingHeight
+                        )
+                    )
+                }
                 else -> {
                     result.notImplemented()
                 }

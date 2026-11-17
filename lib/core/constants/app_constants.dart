@@ -12,6 +12,7 @@ class AppConstants {
   static const String fabArReset = 'fab_ar_reset';
   static const String fabArSaveScan = 'fab_ar_save_scan';
   static const String fabArToggleLidar = 'fab_ar_toggle_lidar';
+  static const String fabArToggleEnclosure = 'fab_ar_toggle_enclosure';
 
   // Method Channels
   static const String arSpatialMethodChannel =

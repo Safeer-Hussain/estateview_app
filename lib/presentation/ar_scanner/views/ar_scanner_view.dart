@@ -6,6 +6,7 @@ import '../../../core/utils/app_feedback.dart';
 import '../../discovery/bloc/property_catalog_bloc.dart';
 import '../bloc/ar_spatial_bloc.dart';
 import '../widgets/point_cloud_visualizer.dart';
+import '../widgets/room_enclosure_visualizer.dart';
 import '../widgets/solar_azimuth_gauge.dart';
 import '../widgets/spatial_viewport_canvas.dart';
 
@@ -207,12 +208,22 @@ class _ArScannerViewState extends State<ArScannerView> {
       children: [
         Column(
           children: [
-            // Spatial Viewport Canvas (2D Planar vs 3D LiDAR)
+            // Spatial Viewport Canvas (2D Planar vs 3D LiDAR vs 3D Wireframe Enclosure)
             Expanded(
               flex: 6,
               child: Stack(
                 children: [
-                  if (state.isLidarActive)
+                  if (state.isEnclosureActive)
+                    RoomEnclosureVisualizer(
+                      enclosure: state.roomEnclosure,
+                      selectedWall: state.selectedWall,
+                      onSelectWall: (wall) {
+                        context.read<ArSpatialBloc>().add(
+                          SelectWallPlaneEvent(wall),
+                        );
+                      },
+                    )
+                  else if (state.isLidarActive)
                     PointCloudVisualizer(
                       pointCloud: state.latestPointCloud,
                       isStreaming: state.isLidarActive,
@@ -279,30 +290,11 @@ class _ArScannerViewState extends State<ArScannerView> {
                     ),
                   ],
 
-                  // 3D LiDAR vs 2D Planar Mode Switcher Button
+                  // Viewport Mode Switcher Pill (2D Planar, 3D LiDAR, 3D Enclosure)
                   Positioned(
                     bottom: 12,
                     right: 12,
-                    child: FloatingActionButton.small(
-                      heroTag: AppConstants.fabArToggleLidar,
-                      backgroundColor: state.isLidarActive
-                          ? colors.primary
-                          : colors.surfaceContainer,
-                      foregroundColor: state.isLidarActive
-                          ? colors.onPrimary
-                          : colors.onSurface,
-                      onPressed: () {
-                        context.read<ArSpatialBloc>().add(
-                          ToggleLidarPointCloudEvent(!state.isLidarActive),
-                        );
-                      },
-                      child: Icon(
-                        state.isLidarActive
-                            ? Icons.grid_view_outlined
-                            : Icons.view_in_ar_outlined,
-                        size: 20,
-                      ),
-                    ),
+                    child: _buildViewportModeSelector(context, colors, state),
                   ),
                 ],
               ),
@@ -452,12 +444,22 @@ class _ArScannerViewState extends State<ArScannerView> {
   ) {
     return Row(
       children: [
-        // Left Pane: Viewport Canvas (2D Planar vs 3D LiDAR)
+        // Left Pane: Viewport Canvas (2D Planar vs 3D LiDAR vs 3D Wireframe Enclosure)
         Expanded(
           flex: 6,
           child: Stack(
             children: [
-              if (state.isLidarActive)
+              if (state.isEnclosureActive)
+                RoomEnclosureVisualizer(
+                  enclosure: state.roomEnclosure,
+                  selectedWall: state.selectedWall,
+                  onSelectWall: (wall) {
+                    context.read<ArSpatialBloc>().add(
+                      SelectWallPlaneEvent(wall),
+                    );
+                  },
+                )
+              else if (state.isLidarActive)
                 PointCloudVisualizer(
                   pointCloud: state.latestPointCloud,
                   isStreaming: state.isLidarActive,
@@ -489,25 +491,11 @@ class _ArScannerViewState extends State<ArScannerView> {
               Positioned(
                 bottom: 8,
                 right: 8,
-                child: FloatingActionButton.small(
-                  heroTag: '${AppConstants.fabArToggleLidar}_landscape',
-                  backgroundColor: state.isLidarActive
-                      ? colors.primary
-                      : colors.surfaceContainer,
-                  foregroundColor: state.isLidarActive
-                      ? colors.onPrimary
-                      : colors.onSurface,
-                  onPressed: () {
-                    context.read<ArSpatialBloc>().add(
-                      ToggleLidarPointCloudEvent(!state.isLidarActive),
-                    );
-                  },
-                  child: Icon(
-                    state.isLidarActive
-                        ? Icons.grid_view_outlined
-                        : Icons.view_in_ar_outlined,
-                    size: 18,
-                  ),
+                child: _buildViewportModeSelector(
+                  context,
+                  colors,
+                  state,
+                  isLandscape: true,
                 ),
               ),
             ],
@@ -637,6 +625,118 @@ class _ArScannerViewState extends State<ArScannerView> {
             style: TextStyle(fontSize: 10, color: colors.onSurfaceVariant),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildViewportModeSelector(
+    BuildContext context,
+    ColorScheme colors,
+    ArSpatialState state, {
+    bool isLandscape = false,
+  }) {
+    final isEnclosure = state.isEnclosureActive;
+    final isLidar = state.isLidarActive && !isEnclosure;
+    final isPlanar = !state.isLidarActive && !isEnclosure;
+
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainer.withOpacity(0.92),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colors.outlineVariant),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildModeButton(
+            context,
+            colors,
+            label: '2D Planar',
+            icon: Icons.grid_view_outlined,
+            isSelected: isPlanar,
+            onTap: () {
+              context.read<ArSpatialBloc>().add(
+                const ToggleLidarPointCloudEvent(false),
+              );
+              context.read<ArSpatialBloc>().add(
+                const ToggleRoomEnclosureEvent(false),
+              );
+            },
+          ),
+          const SizedBox(width: 4),
+          _buildModeButton(
+            context,
+            colors,
+            label: '3D LiDAR',
+            icon: Icons.blur_on_outlined,
+            isSelected: isLidar,
+            onTap: () {
+              context.read<ArSpatialBloc>().add(
+                const ToggleRoomEnclosureEvent(false),
+              );
+              context.read<ArSpatialBloc>().add(
+                const ToggleLidarPointCloudEvent(true),
+              );
+            },
+          ),
+          const SizedBox(width: 4),
+          _buildModeButton(
+            context,
+            colors,
+            label: '3D Enclosure',
+            icon: Icons.architecture_outlined,
+            isSelected: isEnclosure,
+            onTap: () {
+              context.read<ArSpatialBloc>().add(
+                const ToggleLidarPointCloudEvent(false),
+              );
+              context.read<ArSpatialBloc>().add(
+                const ToggleRoomEnclosureEvent(true),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModeButton(
+    BuildContext context,
+    ColorScheme colors, {
+    required String label,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? colors.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 14,
+              color: isSelected ? colors.onPrimary : colors.onSurfaceVariant,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: isSelected ? colors.onPrimary : colors.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

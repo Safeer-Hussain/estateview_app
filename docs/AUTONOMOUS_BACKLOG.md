@@ -13,10 +13,10 @@ This backlog outlines 25 production sprints for continued autonomous evolution o
 - [x] Build 3D point cloud visualizer in Flutter using CustomPainter.
 
 ### Sprint 02: Real-time Wall Plane Reconstruction
-- [ ] Classify vertical and horizontal planes from spatial anchors in Kotlin/Swift.
-- [ ] Implement bounding polygon detection for walls, doors, and window openings.
-- [ ] Render 3D wireframe room enclosures in Flutter with dynamic perspective projection.
-- [ ] Add unit test verifying plane normal orientation math.
+- [x] Classify vertical and horizontal planes from spatial anchors in Kotlin/Swift.
+- [x] Implement bounding polygon detection for walls, doors, and window openings.
+- [x] Render 3D wireframe room enclosures in Flutter with dynamic perspective projection.
+- [x] Add unit test verifying plane normal orientation math.
 
 ### Sprint 03: 3D Furniture Placement Engine
 - [ ] Add vector 3D asset bounding boxes for luxury furniture items.

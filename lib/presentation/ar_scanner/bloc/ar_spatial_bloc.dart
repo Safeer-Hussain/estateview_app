@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/services/ar_spatial_service.dart';
 import '../../../data/models/ar_measurement_model.dart';
+import '../../../data/models/plane_reconstruction_model.dart';
 import '../../../data/repositories/ar_measurement_repository.dart';
 
 // EVENTS
@@ -54,6 +55,21 @@ class DepthPointsUpdatedEvent extends ArSpatialEvent {
   const DepthPointsUpdatedEvent(this.packet);
 }
 
+class ToggleRoomEnclosureEvent extends ArSpatialEvent {
+  final bool enabled;
+  const ToggleRoomEnclosureEvent(this.enabled);
+}
+
+class ReconstructRoomEnclosureEvent extends ArSpatialEvent {
+  final double ceilingHeight;
+  const ReconstructRoomEnclosureEvent({this.ceilingHeight = 2.8});
+}
+
+class SelectWallPlaneEvent extends ArSpatialEvent {
+  final WallPlaneModel? wall;
+  const SelectWallPlaneEvent(this.wall);
+}
+
 // STATE
 class ArSpatialState {
   final bool isSessionActive;
@@ -74,6 +90,9 @@ class ArSpatialState {
   final bool isSaved;
   final bool isLidarActive;
   final DepthPointCloudPacket? latestPointCloud;
+  final bool isEnclosureActive;
+  final RoomEnclosureModel? roomEnclosure;
+  final WallPlaneModel? selectedWall;
   final List<ArMeasurementModel> savedScans;
   final String? message;
 
@@ -96,6 +115,9 @@ class ArSpatialState {
     required this.isSaved,
     required this.isLidarActive,
     this.latestPointCloud,
+    required this.isEnclosureActive,
+    this.roomEnclosure,
+    this.selectedWall,
     required this.savedScans,
     this.message,
   });
@@ -120,6 +142,9 @@ class ArSpatialState {
       isSaved: false,
       isLidarActive: false,
       latestPointCloud: null,
+      isEnclosureActive: false,
+      roomEnclosure: null,
+      selectedWall: null,
       savedScans: [],
       message: null,
     );
@@ -144,6 +169,9 @@ class ArSpatialState {
     bool? isSaved,
     bool? isLidarActive,
     DepthPointCloudPacket? latestPointCloud,
+    bool? isEnclosureActive,
+    RoomEnclosureModel? roomEnclosure,
+    WallPlaneModel? selectedWall,
     List<ArMeasurementModel>? savedScans,
     String? message,
   }) {
@@ -167,6 +195,9 @@ class ArSpatialState {
       isSaved: isSaved ?? this.isSaved,
       isLidarActive: isLidarActive ?? this.isLidarActive,
       latestPointCloud: latestPointCloud ?? this.latestPointCloud,
+      isEnclosureActive: isEnclosureActive ?? this.isEnclosureActive,
+      roomEnclosure: roomEnclosure ?? this.roomEnclosure,
+      selectedWall: selectedWall ?? this.selectedWall,
       savedScans: savedScans ?? this.savedScans,
       message: message,
     );
@@ -191,6 +222,9 @@ class ArSpatialBloc extends Bloc<ArSpatialEvent, ArSpatialState> {
     on<LoadSavedScansEvent>(_onLoadSavedScans);
     on<ToggleLidarPointCloudEvent>(_onToggleLidarPointCloud);
     on<DepthPointsUpdatedEvent>(_onDepthPointsUpdated);
+    on<ToggleRoomEnclosureEvent>(_onToggleRoomEnclosure);
+    on<ReconstructRoomEnclosureEvent>(_onReconstructRoomEnclosure);
+    on<SelectWallPlaneEvent>(_onSelectWallPlane);
   }
 
   void _onToggleLidarPointCloud(
@@ -225,6 +259,55 @@ class ArSpatialBloc extends Bloc<ArSpatialEvent, ArSpatialState> {
     Emitter<ArSpatialState> emit,
   ) {
     emit(state.copyWith(latestPointCloud: event.packet));
+  }
+
+  void _onToggleRoomEnclosure(
+    ToggleRoomEnclosureEvent event,
+    Emitter<ArSpatialState> emit,
+  ) {
+    emit(
+      state.copyWith(
+        isEnclosureActive: event.enabled,
+        message: event.enabled
+            ? '3D Wireframe Room Enclosure Active'
+            : 'Switched Viewport',
+      ),
+    );
+    if (event.enabled &&
+        state.anchors.length >= 3 &&
+        state.roomEnclosure == null) {
+      add(const ReconstructRoomEnclosureEvent());
+    }
+  }
+
+  Future<void> _onReconstructRoomEnclosure(
+    ReconstructRoomEnclosureEvent event,
+    Emitter<ArSpatialState> emit,
+  ) async {
+    final anchorMaps = state.anchors
+        .map((a) => {'x': a.dx / 100.0, 'z': a.dy / 100.0})
+        .toList();
+
+    final enclosure = await _service.reconstructWallPlanes(
+      anchorMaps,
+      ceilingHeight: event.ceilingHeight,
+    );
+
+    emit(
+      state.copyWith(
+        roomEnclosure: enclosure,
+        selectedWall: enclosure.walls.isNotEmpty ? enclosure.walls.first : null,
+        message:
+            'Reconstructed ${enclosure.walls.length} 3D Wall Planes with Openings',
+      ),
+    );
+  }
+
+  void _onSelectWallPlane(
+    SelectWallPlaneEvent event,
+    Emitter<ArSpatialState> emit,
+  ) {
+    emit(state.copyWith(selectedWall: event.wall));
   }
 
   Future<void> _onInitializeArSession(
@@ -352,6 +435,9 @@ class ArSpatialBloc extends Bloc<ArSpatialEvent, ArSpatialState> {
         flooringCostEstimate: 0.0,
         isClosed: false,
         isSaved: false,
+        isEnclosureActive: false,
+        roomEnclosure: null,
+        selectedWall: null,
         message: 'Spatial anchors cleared.',
       ),
     );

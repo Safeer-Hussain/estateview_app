@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:flutter/services.dart';
 
+import '../../data/models/plane_reconstruction_model.dart';
 import '../constants/app_constants.dart';
 
 class SpatialTelemetryPacket {
@@ -235,6 +236,183 @@ class ArSpatialService {
       // Fallback
     }
     return {'status': 'RESET', 'anchorCount': 0};
+  }
+
+  Future<RoomEnclosureModel> reconstructWallPlanes(
+    List<Map<String, double>> anchors, {
+    double ceilingHeight = 2.8,
+  }) async {
+    try {
+      final result = await _methodChannel.invokeMethod<Map<dynamic, dynamic>>(
+        'reconstructWallPlanes',
+        {'ceilingHeight': ceilingHeight},
+      );
+      if (result != null) {
+        return RoomEnclosureModel.fromMap(result);
+      }
+    } catch (_) {
+      // Fallback mathematical reconstruction
+    }
+
+    final n = anchors.length;
+    if (n < 3) {
+      return RoomEnclosureModel(
+        walls: const [],
+        floorPlane: const HorizontalPlaneModel(
+          type: PlaneType.horizontalFloor,
+          normal: [0.0, 1.0, 0.0],
+          elevationMeters: 0.0,
+        ),
+        ceilingPlane: HorizontalPlaneModel(
+          type: PlaneType.horizontalCeiling,
+          normal: const [0.0, -1.0, 0.0],
+          elevationMeters: ceilingHeight,
+        ),
+        totalGrossWallAreaSqMeters: 0.0,
+        totalNetWallAreaSqMeters: 0.0,
+        totalOpeningsCount: 0,
+        ceilingHeightMeters: ceilingHeight,
+      );
+    }
+
+    double centroidX = 0.0;
+    double centroidZ = 0.0;
+    for (final a in anchors) {
+      centroidX += a['x'] ?? 0.0;
+      centroidZ += a['z'] ?? (a['y'] ?? 0.0);
+    }
+    centroidX /= n;
+    centroidZ /= n;
+
+    final walls = <WallPlaneModel>[];
+    double totalGross = 0.0;
+    double totalNet = 0.0;
+    int openingsCount = 0;
+
+    for (int i = 0; i < n; i++) {
+      final p1 = anchors[i];
+      final p2 = anchors[(i + 1) % n];
+      final x1 = p1['x'] ?? 0.0;
+      final z1 = p1['z'] ?? (p1['y'] ?? 0.0);
+      final x2 = p2['x'] ?? 0.0;
+      final z2 = p2['z'] ?? (p2['y'] ?? 0.0);
+
+      final dx = x2 - x1;
+      final dz = z2 - z1;
+      final length = sqrt(dx * dx + dz * dz);
+      if (length < 0.001) continue;
+
+      var nx = -dz / length;
+      var nz = dx / length;
+
+      final midX = (x1 + x2) / 2.0;
+      final midZ = (z1 + z2) / 2.0;
+
+      final toCentroidX = centroidX - midX;
+      final toCentroidZ = centroidZ - midZ;
+      if (nx * toCentroidX + nz * toCentroidZ < 0) {
+        nx = -nx;
+        nz = -nz;
+      }
+
+      final grossArea = length * ceilingHeight;
+      totalGross += grossArea;
+
+      final openings = <ArchitecturalOpeningModel>[];
+      double openingAreaSum = 0.0;
+
+      if (i == 0 && length >= 2.0) {
+        const doorW = 0.95;
+        const doorH = 2.10;
+        const doorArea = doorW * doorH;
+        openings.add(
+          const ArchitecturalOpeningModel(
+            id: 'opening-door-0',
+            type: OpeningType.door,
+            widthMeters: doorW,
+            heightMeters: doorH,
+            offsetMeters: 0.45,
+            sillHeightMeters: 0.0,
+            areaSqMeters: doorArea,
+          ),
+        );
+        openingAreaSum += doorArea;
+        openingsCount++;
+      } else if (length >= 3.2) {
+        final winW = (length * 0.55).clamp(1.6, 2.8);
+        const winH = 1.40;
+        final winArea = winW * winH;
+        openings.add(
+          ArchitecturalOpeningModel(
+            id: 'opening-win-$i',
+            type: OpeningType.window,
+            widthMeters: winW,
+            heightMeters: winH,
+            offsetMeters: (length - winW) / 2.0,
+            sillHeightMeters: 0.90,
+            areaSqMeters: winArea,
+          ),
+        );
+        openingAreaSum += winArea;
+        openingsCount++;
+      }
+
+      final netArea = max(grossArea - openingAreaSum, 0.0);
+      totalNet += netArea;
+
+      final String orientation;
+      if (nz > 0.7) {
+        orientation = 'SOUTH_FACING';
+      } else if (nz < -0.7) {
+        orientation = 'NORTH_FACING';
+      } else if (nx > 0.7) {
+        orientation = 'EAST_FACING';
+      } else if (nx < -0.7) {
+        orientation = 'WEST_FACING';
+      } else if (nz > 0 && nx > 0) {
+        orientation = 'SOUTH_EAST';
+      } else if (nz > 0 && nx < 0) {
+        orientation = 'SOUTH_WEST';
+      } else if (nz < 0 && nx > 0) {
+        orientation = 'NORTH_EAST';
+      } else {
+        orientation = 'NORTH_WEST';
+      }
+
+      walls.add(
+        WallPlaneModel(
+          id: 'wall-${i + 1}',
+          wallIndex: i,
+          p1: Offset(x1, z1),
+          p2: Offset(x2, z2),
+          lengthMeters: length,
+          heightMeters: ceilingHeight,
+          normal: [nx, 0.0, nz],
+          grossAreaSqMeters: grossArea,
+          netAreaSqMeters: netArea,
+          orientation: orientation,
+          openings: openings,
+        ),
+      );
+    }
+
+    return RoomEnclosureModel(
+      walls: walls,
+      floorPlane: const HorizontalPlaneModel(
+        type: PlaneType.horizontalFloor,
+        normal: [0.0, 1.0, 0.0],
+        elevationMeters: 0.0,
+      ),
+      ceilingPlane: HorizontalPlaneModel(
+        type: PlaneType.horizontalCeiling,
+        normal: const [0.0, -1.0, 0.0],
+        elevationMeters: ceilingHeight,
+      ),
+      totalGrossWallAreaSqMeters: totalGross,
+      totalNetWallAreaSqMeters: totalNet,
+      totalOpeningsCount: openingsCount,
+      ceilingHeightMeters: ceilingHeight,
+    );
   }
 
   Stream<SpatialTelemetryPacket> streamSpatialTelemetry() {
