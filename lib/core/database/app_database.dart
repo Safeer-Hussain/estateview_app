@@ -11,6 +11,7 @@ import '../../data/models/floorplan_model.dart';
 import '../../data/models/tour_booking_model.dart';
 import '../../data/models/ar_measurement_model.dart';
 import '../../data/models/ai_message_model.dart';
+import '../../data/models/staged_furniture_model.dart';
 import '../constants/app_constants.dart';
 
 class AppDatabase {
@@ -104,6 +105,30 @@ class AppDatabase {
         sender TEXT NOT NULL,
         content TEXT NOT NULL,
         timestamp INTEGER NOT NULL
+      )
+    ''');
+
+    await _ensureStagedFurnitureTable(db);
+  }
+
+  Future<void> _ensureStagedFurnitureTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS staged_furniture (
+        id TEXT PRIMARY KEY,
+        property_id TEXT NOT NULL,
+        preset_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        category TEXT NOT NULL,
+        width_meters REAL NOT NULL,
+        depth_meters REAL NOT NULL,
+        height_meters REAL NOT NULL,
+        pos_x REAL NOT NULL,
+        pos_z REAL NOT NULL,
+        rotation_y REAL NOT NULL,
+        scale REAL NOT NULL,
+        color_hex TEXT NOT NULL,
+        price_usd REAL NOT NULL,
+        created_at INTEGER NOT NULL
       )
     ''');
   }
@@ -221,6 +246,51 @@ class AppDatabase {
   Future<void> clearAiMessages() async {
     final db = await database;
     await db.delete('ai_concierge_messages');
+  }
+
+  // --- STAGED 3D FURNITURE QUERIES ---
+  Future<List<StagedFurnitureModel>> getStagedFurnitureByPropertyId(
+    String propertyId,
+  ) async {
+    final db = await database;
+    await _ensureStagedFurnitureTable(db);
+    final maps = await db.query(
+      'staged_furniture',
+      where: 'property_id = ?',
+      whereArgs: [propertyId],
+      orderBy: 'created_at ASC',
+    );
+    return maps.map((m) => StagedFurnitureModel.fromMap(m)).toList();
+  }
+
+  Future<int> saveStagedFurnitureItem(StagedFurnitureModel item) async {
+    final db = await database;
+    await _ensureStagedFurnitureTable(db);
+    return await db.insert(
+      'staged_furniture',
+      item.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<int> deleteStagedFurnitureItem(String id) async {
+    final db = await database;
+    await _ensureStagedFurnitureTable(db);
+    return await db.delete(
+      'staged_furniture',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<int> clearStagedFurnitureForProperty(String propertyId) async {
+    final db = await database;
+    await _ensureStagedFurnitureTable(db);
+    return await db.delete(
+      'staged_furniture',
+      where: 'property_id = ?',
+      whereArgs: [propertyId],
+    );
   }
 
   // --- SEED DATA (22 PROPERTIES ACROSS DHA LAHORE, GULBERG, BAHRIA & GLOBAL HUBS) ---

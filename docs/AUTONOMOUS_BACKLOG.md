@@ -19,10 +19,10 @@ This backlog outlines 25 production sprints for continued autonomous evolution o
 - [x] Add unit test verifying plane normal orientation math.
 
 ### Sprint 03: 3D Furniture Placement Engine
-- [ ] Add vector 3D asset bounding boxes for luxury furniture items.
-- [ ] Implement raycast collision detection against placed floor planes.
-- [ ] Add rotation and scale gesture manipulators in `SpatialViewportCanvas`.
-- [ ] Persist placed furniture configurations to SQLite database table `staged_furniture`.
+- [x] Add vector 3D asset bounding boxes for luxury furniture items.
+- [x] Implement raycast collision detection against placed floor planes.
+- [x] Add rotation and scale gesture manipulators in `SpatialViewportCanvas`.
+- [x] Persist placed furniture configurations to SQLite database table `staged_furniture`.
 
 ### Sprint 04: USDZ & glTF 3D Floorplan Export
 - [ ] Implement glTF 2.0 binary serializer in Dart for room meshes.

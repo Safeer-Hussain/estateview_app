@@ -1,7 +1,7 @@
 class AppConstants {
   static const String appName = 'EstateView';
   static const String appTagline = 'Architectural PropTech & Spatial Studio';
-  static const String appVersion = 'v1.4.2-flagship';
+  static const String appVersion = 'v1.4.3-flagship';
 
   // Navigation Keys & Hero Tags
   static const String fabPropertyScheduleTour = 'fab_property_schedule_tour';
@@ -13,6 +13,8 @@ class AppConstants {
   static const String fabArSaveScan = 'fab_ar_save_scan';
   static const String fabArToggleLidar = 'fab_ar_toggle_lidar';
   static const String fabArToggleEnclosure = 'fab_ar_toggle_enclosure';
+  static const String fabArStageFurniture = 'fab_ar_stage_furniture';
+  static const String fabArClearStaging = 'fab_ar_clear_staging';
 
   // Method Channels
   static const String arSpatialMethodChannel =

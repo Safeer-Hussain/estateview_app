@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:math';
+
 import 'package:image/image.dart' as img;
 
 void main() {
@@ -12,9 +13,24 @@ void main() {
   generateCommercialHub();
   generateSmartTownhouse();
   generateBlueprintFloorplan();
-  generateAdvisorAvatar('assets/images/advisor_sarah.png', img.ColorRgb8(16, 185, 129), img.ColorRgb8(5, 150, 105), 'SC');
-  generateAdvisorAvatar('assets/images/advisor_omar.png', img.ColorRgb8(59, 130, 246), img.ColorRgb8(29, 78, 216), 'OH');
-  generateAdvisorAvatar('assets/images/advisor_elena.png', img.ColorRgb8(245, 158, 11), img.ColorRgb8(180, 83, 9), 'ER');
+  generateAdvisorAvatar(
+    'assets/images/advisor_sarah.png',
+    img.ColorRgb8(16, 185, 129),
+    img.ColorRgb8(5, 150, 105),
+    'SC',
+  );
+  generateAdvisorAvatar(
+    'assets/images/advisor_omar.png',
+    img.ColorRgb8(59, 130, 246),
+    img.ColorRgb8(29, 78, 216),
+    'OH',
+  );
+  generateAdvisorAvatar(
+    'assets/images/advisor_elena.png',
+    img.ColorRgb8(245, 158, 11),
+    img.ColorRgb8(180, 83, 9),
+    'ER',
+  );
 
   print('All assets generated successfully.');
 }
@@ -22,7 +38,7 @@ void main() {
 void generateAppIcon() {
   const size = 512;
   final image = img.Image(width: size, height: size);
-  
+
   // Background: Obsidian slate gradient
   for (int y = 0; y < size; y++) {
     final t = y / size;
@@ -108,7 +124,14 @@ void generateVillaCourtyard() {
   final woodTimber = img.ColorRgb8(180, 83, 9);
 
   // Stone terrace ground
-  img.fillRect(image, x1: 0, y1: 280, x2: width, y2: height, color: terraceStone);
+  img.fillRect(
+    image,
+    x1: 0,
+    y1: 280,
+    x2: width,
+    y2: height,
+    color: terraceStone,
+  );
 
   // Reflection infinity pool
   img.fillRect(image, x1: 150, y1: 360, x2: 650, y2: 480, color: poolColor);
@@ -127,14 +150,29 @@ void generateVillaCourtyard() {
   }
 
   // Floating concrete cantilever roof slab
-  img.fillRect(image, x1: 80, y1: 120, x2: 720, y2: 145, color: img.ColorRgb8(30, 41, 59));
+  img.fillRect(
+    image,
+    x1: 80,
+    y1: 120,
+    x2: 720,
+    y2: 145,
+    color: img.ColorRgb8(30, 41, 59),
+  );
 
   // Soft reflection ripple in the pool
   for (int y = 370; y < 470; y += 12) {
-    img.drawLine(image, x1: 200, y1: y, x2: 600, y2: y, color: img.ColorRgb8(20, 184, 166));
+    img.drawLine(
+      image,
+      x1: 200,
+      y1: y,
+      x2: 600,
+      y2: y,
+      color: img.ColorRgb8(20, 184, 166),
+    );
   }
 
-  File('assets/images/villa_courtyard.png').writeAsBytesSync(img.encodePng(image));
+  File('assets/images/villa_courtyard.png')
+      .writeAsBytesSync(img.encodePng(image));
 }
 
 void generatePenthouseLoft() {
@@ -166,11 +204,25 @@ void generatePenthouseLoft() {
   ];
 
   for (final t in towers) {
-    img.fillRect(image, x1: t[0], y1: t[1], x2: t[2], y2: height, color: towerColor);
+    img.fillRect(
+      image,
+      x1: t[0],
+      y1: t[1],
+      x2: t[2],
+      y2: height,
+      color: towerColor,
+    );
     for (int ly = t[1] + 15; ly < 400; ly += 20) {
       for (int lx = t[0] + 10; lx < t[2] - 10; lx += 15) {
         if ((lx + ly) % 3 != 0) {
-          img.fillRect(image, x1: lx, y1: ly, x2: lx + 4, y2: ly + 6, color: towerLight);
+          img.fillRect(
+            image,
+            x1: lx,
+            y1: ly,
+            x2: lx + 4,
+            y2: ly + 6,
+            color: towerLight,
+          );
         }
       }
     }
@@ -183,17 +235,39 @@ void generatePenthouseLoft() {
   img.fillRect(image, x1: 0, y1: 0, x2: width, y2: 30, color: frameColor);
   img.fillRect(image, x1: 0, y1: 420, x2: width, y2: height, color: frameColor);
   img.fillRect(image, x1: 0, y1: 0, x2: 40, y2: height, color: frameColor);
-  img.fillRect(image, x1: width - 40, y1: 0, x2: width, y2: height, color: frameColor);
+  img.fillRect(
+    image,
+    x1: width - 40,
+    y1: 0,
+    x2: width,
+    y2: height,
+    color: frameColor,
+  );
 
   // Architectural mullions
   img.drawLine(image, x1: 270, y1: 30, x2: 270, y2: 420, color: metalBeams);
   img.drawLine(image, x1: 530, y1: 30, x2: 530, y2: 420, color: metalBeams);
-  img.drawLine(image, x1: 40, y1: 220, x2: width - 40, y2: 220, color: metalBeams);
+  img.drawLine(
+    image,
+    x1: 40,
+    y1: 220,
+    x2: width - 40,
+    y2: 220,
+    color: metalBeams,
+  );
 
   // Interior herringbone parquet floor hint
-  img.fillRect(image, x1: 40, y1: 420, x2: width - 40, y2: height, color: img.ColorRgb8(120, 53, 15));
+  img.fillRect(
+    image,
+    x1: 40,
+    y1: 420,
+    x2: width - 40,
+    y2: height,
+    color: img.ColorRgb8(120, 53, 15),
+  );
 
-  File('assets/images/penthouse_loft.png').writeAsBytesSync(img.encodePng(image));
+  File('assets/images/penthouse_loft.png')
+      .writeAsBytesSync(img.encodePng(image));
 }
 
 void generateCommercialHub() {
@@ -221,7 +295,14 @@ void generateCommercialHub() {
   // Stepped tower block 1
   img.fillRect(image, x1: 180, y1: 80, x2: 440, y2: 440, color: facadeBlue);
   // Stepped tower block 2
-  img.fillRect(image, x1: 440, y1: 140, x2: 640, y2: 440, color: img.ColorRgb8(3, 105, 161));
+  img.fillRect(
+    image,
+    x1: 440,
+    y1: 140,
+    x2: 640,
+    y2: 440,
+    color: img.ColorRgb8(3, 105, 161),
+  );
 
   // Sky garden terraces
   img.fillRect(image, x1: 440, y1: 130, x2: 640, y2: 145, color: terraceGarden);
@@ -243,12 +324,20 @@ void generateCommercialHub() {
   }
 
   // Plaza street level
-  img.fillRect(image, x1: 0, y1: 440, x2: width, y2: height, color: img.ColorRgb8(30, 41, 59));
+  img.fillRect(
+    image,
+    x1: 0,
+    y1: 440,
+    x2: width,
+    y2: height,
+    color: img.ColorRgb8(30, 41, 59),
+  );
   for (int x = 40; x < width; x += 80) {
     img.drawCircle(image, x: x, y: 448, radius: 12, color: terraceGarden);
   }
 
-  File('assets/images/commercial_hub.png').writeAsBytesSync(img.encodePng(image));
+  File('assets/images/commercial_hub.png')
+      .writeAsBytesSync(img.encodePng(image));
 }
 
 void generateSmartTownhouse() {
@@ -290,9 +379,17 @@ void generateSmartTownhouse() {
   img.fillRect(image, x1: 240, y1: 265, x2: 560, y2: 280, color: stoneEntry);
 
   // Pathway
-  img.fillRect(image, x1: 0, y1: 430, x2: width, y2: height, color: img.ColorRgb8(15, 23, 42));
+  img.fillRect(
+    image,
+    x1: 0,
+    y1: 430,
+    x2: width,
+    y2: height,
+    color: img.ColorRgb8(15, 23, 42),
+  );
 
-  File('assets/images/smart_townhouse.png').writeAsBytesSync(img.encodePng(image));
+  File('assets/images/smart_townhouse.png')
+      .writeAsBytesSync(img.encodePng(image));
 }
 
 void generateBlueprintFloorplan() {
@@ -322,18 +419,53 @@ void generateBlueprintFloorplan() {
   // Exterior walls (thick)
   void drawThickLine(int x1, int y1, int x2, int y2) {
     img.drawLine(image, x1: x1, y1: y1, x2: x2, y2: y2, color: wallLine);
-    img.drawLine(image, x1: x1 + 1, y1: y1 + 1, x2: x2 + 1, y2: y2 + 1, color: wallLine);
-    img.drawLine(image, x1: x1 - 1, y1: y1 - 1, x2: x2 - 1, y2: y2 - 1, color: wallLine);
+    img.drawLine(
+      image,
+      x1: x1 + 1,
+      y1: y1 + 1,
+      x2: x2 + 1,
+      y2: y2 + 1,
+      color: wallLine,
+    );
+    img.drawLine(
+      image,
+      x1: x1 - 1,
+      y1: y1 - 1,
+      x2: x2 - 1,
+      y2: y2 - 1,
+      color: wallLine,
+    );
   }
 
   // Living Atrium room zone
-  img.fillRect(image, x1: 100, y1: 100, x2: 450, y2: 350, color: img.ColorRgb8(20, 48, 88));
+  img.fillRect(
+    image,
+    x1: 100,
+    y1: 100,
+    x2: 450,
+    y2: 350,
+    color: img.ColorRgb8(20, 48, 88),
+  );
   // Master Suite room zone
   img.fillRect(image, x1: 450, y1: 100, x2: 700, y2: 350, color: highlightZone);
   // Gourmet Kitchen & Dining
-  img.fillRect(image, x1: 100, y1: 350, x2: 450, y2: 520, color: img.ColorRgb8(20, 48, 88));
+  img.fillRect(
+    image,
+    x1: 100,
+    y1: 350,
+    x2: 450,
+    y2: 520,
+    color: img.ColorRgb8(20, 48, 88),
+  );
   // Terrace & Pool Deck
-  img.fillRect(image, x1: 450, y1: 350, x2: 700, y2: 520, color: img.ColorRgb8(12, 74, 96));
+  img.fillRect(
+    image,
+    x1: 450,
+    y1: 350,
+    x2: 700,
+    y2: 520,
+    color: img.ColorRgb8(12, 74, 96),
+  );
 
   // Perimeter walls
   drawThickLine(100, 100, 700, 100);
@@ -358,10 +490,16 @@ void generateBlueprintFloorplan() {
   img.drawLine(image, x1: 740, y1: 40, x2: 730, y2: 55, color: textWhite);
   img.drawLine(image, x1: 740, y1: 40, x2: 750, y2: 55, color: textWhite);
 
-  File('assets/images/blueprint_floorplan.png').writeAsBytesSync(img.encodePng(image));
+  File('assets/images/blueprint_floorplan.png')
+      .writeAsBytesSync(img.encodePng(image));
 }
 
-void generateAdvisorAvatar(String path, img.Color primary, img.Color secondary, String initials) {
+void generateAdvisorAvatar(
+  String path,
+  img.Color primary,
+  img.Color secondary,
+  String initials,
+) {
   const size = 256;
   final image = img.Image(width: size, height: size);
 
@@ -397,7 +535,13 @@ void generateAdvisorAvatar(String path, img.Color primary, img.Color secondary, 
   // Verified badge in corner
   final gold = img.ColorRgb8(245, 158, 11);
   img.drawCircle(image, x: 200, y: 200, radius: 24, color: gold);
-  img.drawCircle(image, x: 200, y: 200, radius: 22, color: img.ColorRgb8(15, 23, 42));
+  img.drawCircle(
+    image,
+    x: 200,
+    y: 200,
+    radius: 22,
+    color: img.ColorRgb8(15, 23, 42),
+  );
   // Star/checkmark
   img.drawLine(image, x1: 192, y1: 200, x2: 198, y2: 206, color: gold);
   img.drawLine(image, x1: 198, y1: 206, x2: 209, y2: 194, color: gold);

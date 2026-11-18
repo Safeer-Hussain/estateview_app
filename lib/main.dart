@@ -9,6 +9,7 @@ import 'core/theme/app_theme.dart';
 import 'core/theme/theme_cubit.dart';
 import 'presentation/ai_concierge/bloc/ai_concierge_cubit.dart';
 import 'presentation/ar_scanner/bloc/ar_spatial_bloc.dart';
+import 'presentation/ar_scanner/bloc/furniture_staging_cubit.dart';
 import 'presentation/discovery/bloc/property_catalog_bloc.dart';
 import 'presentation/neighborhood/bloc/neighborhood_cubit.dart';
 import 'presentation/roi_analyzer/bloc/mortgage_roi_cubit.dart';
@@ -53,6 +54,9 @@ class EstateViewApp extends StatelessWidget {
         ),
         BlocProvider<NeighborhoodCubit>(create: (_) => sl<NeighborhoodCubit>()),
         BlocProvider<ArSpatialBloc>(create: (_) => sl<ArSpatialBloc>()),
+        BlocProvider<FurnitureStagingCubit>(
+          create: (_) => sl<FurnitureStagingCubit>(),
+        ),
         BlocProvider<MortgageRoiCubit>(create: (_) => sl<MortgageRoiCubit>()),
         BlocProvider<AiConciergeCubit>(create: (_) => sl<AiConciergeCubit>()),
       ],

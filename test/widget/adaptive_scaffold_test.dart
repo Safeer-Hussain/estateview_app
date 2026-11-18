@@ -6,6 +6,7 @@ import 'package:estate_view_app/core/theme/app_theme.dart';
 import 'package:estate_view_app/core/theme/theme_cubit.dart';
 import 'package:estate_view_app/presentation/ai_concierge/bloc/ai_concierge_cubit.dart';
 import 'package:estate_view_app/presentation/ar_scanner/bloc/ar_spatial_bloc.dart';
+import 'package:estate_view_app/presentation/ar_scanner/bloc/furniture_staging_cubit.dart';
 import 'package:estate_view_app/presentation/discovery/bloc/property_catalog_bloc.dart';
 import 'package:estate_view_app/presentation/neighborhood/bloc/neighborhood_cubit.dart';
 import 'package:estate_view_app/presentation/roi_analyzer/bloc/mortgage_roi_cubit.dart';
@@ -23,6 +24,9 @@ Widget createTestApp() {
       ),
       BlocProvider<NeighborhoodCubit>(create: (_) => sl<NeighborhoodCubit>()),
       BlocProvider<ArSpatialBloc>(create: (_) => sl<ArSpatialBloc>()),
+      BlocProvider<FurnitureStagingCubit>(
+        create: (_) => sl<FurnitureStagingCubit>(),
+      ),
       BlocProvider<MortgageRoiCubit>(create: (_) => sl<MortgageRoiCubit>()),
       BlocProvider<AiConciergeCubit>(create: (_) => sl<AiConciergeCubit>()),
     ],

@@ -10,9 +10,11 @@ import '../theme/theme_cubit.dart';
 import '../../data/repositories/property_repository.dart';
 import '../../data/repositories/tour_repository.dart';
 import '../../data/repositories/ar_measurement_repository.dart';
+import '../../data/repositories/staged_furniture_repository.dart';
 import '../../presentation/discovery/bloc/property_catalog_bloc.dart';
 import '../../presentation/neighborhood/bloc/neighborhood_cubit.dart';
 import '../../presentation/ar_scanner/bloc/ar_spatial_bloc.dart';
+import '../../presentation/ar_scanner/bloc/furniture_staging_cubit.dart';
 import '../../presentation/roi_analyzer/bloc/mortgage_roi_cubit.dart';
 import '../../presentation/ai_concierge/bloc/ai_concierge_cubit.dart';
 
@@ -39,12 +41,16 @@ Future<void> setupLocator() async {
   sl.registerLazySingleton<ArMeasurementRepository>(
     () => ArMeasurementRepository(sl()),
   );
+  sl.registerLazySingleton<StagedFurnitureRepository>(
+    () => StagedFurnitureRepositoryImpl(sl()),
+  );
 
   // State Management (Theme, BLoCs, Cubits)
   sl.registerLazySingleton<ThemeCubit>(() => ThemeCubit(sl()));
   sl.registerFactory<PropertyCatalogBloc>(() => PropertyCatalogBloc(sl()));
   sl.registerFactory<NeighborhoodCubit>(() => NeighborhoodCubit());
   sl.registerFactory<ArSpatialBloc>(() => ArSpatialBloc(sl(), sl()));
+  sl.registerFactory<FurnitureStagingCubit>(() => FurnitureStagingCubit(sl()));
   sl.registerFactory<MortgageRoiCubit>(() => MortgageRoiCubit());
   sl.registerFactory<AiConciergeCubit>(
     () => AiConciergeCubit(sl(), sl(), sl(), sl()),

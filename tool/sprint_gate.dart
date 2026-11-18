@@ -20,7 +20,13 @@ Future<void> main(List<String> args) async {
   await _runStep(
     name: '2. Dart Format Check (Strict Fail-on-Diff)',
     executable: 'dart',
-    arguments: ['format', '--output=none', '--set-exit-if-changed', 'lib', 'test'],
+    arguments: [
+      'format',
+      '--output=none',
+      '--set-exit-if-changed',
+      'lib',
+      'test',
+    ],
   );
 
   // Step 3: Static Analysis (Strict with deprecations ignored for Flutter SDK 3.47+)
@@ -42,7 +48,9 @@ Future<void> main(List<String> args) async {
 
   stopwatch.stop();
   stdout.writeln('====================================================');
-  stdout.writeln('[SUCCESS] All Sprint Gates Passed in ${stopwatch.elapsed.inSeconds}s.');
+  stdout.writeln(
+    '[SUCCESS] All Sprint Gates Passed in ${stopwatch.elapsed.inSeconds}s.',
+  );
   stdout.writeln('Ready for Production CI & Mainline Merges.');
   stdout.writeln('====================================================');
 }
@@ -79,21 +87,34 @@ Future<void> _runAdbCheck() async {
           .where((l) => l.trim().isNotEmpty && !l.contains('List of devices'));
 
       if (deviceLines.isEmpty) {
-        stdout.writeln('[INFO] No ADB physical devices connected. Skipping logcat audit.');
+        stdout.writeln(
+          '[INFO] No ADB physical devices connected. Skipping logcat audit.',
+        );
       } else {
-        stdout.writeln('[INFO] Connected devices detected: ${deviceLines.length}');
-        final logcat = await Process.run('adb', ['logcat', '-d'], runInShell: true);
+        stdout.writeln(
+          '[INFO] Connected devices detected: ${deviceLines.length}',
+        );
+        final logcat = await Process.run('adb', [
+          'logcat',
+          '-d',
+        ], runInShell: true);
         final logOutput = logcat.stdout.toString();
         if (logOutput.contains('FATAL EXCEPTION') ||
-            logOutput.contains('io.flutter.embedding.engine.renderer.FlutterRenderer') &&
+            logOutput.contains(
+                  'io.flutter.embedding.engine.renderer.FlutterRenderer',
+                ) &&
                 logOutput.contains('crash')) {
-          stderr.writeln('[WARNING] Suspect crash signatures observed in logcat buffer.');
+          stderr.writeln(
+            '[WARNING] Suspect crash signatures observed in logcat buffer.',
+          );
         } else {
           stdout.writeln('[PASSED] Clean device logcat buffer.');
         }
       }
     } else {
-      stdout.writeln('[INFO] ADB not available in PATH. Skipping hardware check.');
+      stdout.writeln(
+        '[INFO] ADB not available in PATH. Skipping hardware check.',
+      );
     }
   } catch (e) {
     stdout.writeln('[INFO] ADB verification bypassed: $e');

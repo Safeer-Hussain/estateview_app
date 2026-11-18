@@ -6,9 +6,11 @@ import 'package:estate_view_app/data/models/floorplan_model.dart';
 import 'package:estate_view_app/data/models/property_model.dart';
 import 'package:estate_view_app/data/models/tour_booking_model.dart';
 import 'package:estate_view_app/data/models/ar_measurement_model.dart';
+import 'package:estate_view_app/data/models/staged_furniture_model.dart';
 import 'package:estate_view_app/data/repositories/property_repository.dart';
 import 'package:estate_view_app/data/repositories/tour_repository.dart';
 import 'package:estate_view_app/data/repositories/ar_measurement_repository.dart';
+import 'package:estate_view_app/data/repositories/staged_furniture_repository.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockAppDatabase extends Mock implements AppDatabase {
@@ -254,5 +256,36 @@ class MockArMeasurementRepository implements ArMeasurementRepository {
   @override
   Future<List<ArMeasurementModel>> getMeasurements() async {
     return measurements;
+  }
+}
+
+class MockStagedFurnitureRepository implements StagedFurnitureRepository {
+  List<StagedFurnitureModel> stagedItems = [];
+
+  @override
+  Future<List<StagedFurnitureModel>> getStagedFurniture(
+    String propertyId,
+  ) async {
+    return stagedItems.where((i) => i.propertyId == propertyId).toList();
+  }
+
+  @override
+  Future<void> saveStagedFurniture(StagedFurnitureModel item) async {
+    final index = stagedItems.indexWhere((i) => i.id == item.id);
+    if (index >= 0) {
+      stagedItems[index] = item;
+    } else {
+      stagedItems.add(item);
+    }
+  }
+
+  @override
+  Future<void> removeStagedFurniture(String id) async {
+    stagedItems.removeWhere((i) => i.id == id);
+  }
+
+  @override
+  Future<void> clearStagedFurniture(String propertyId) async {
+    stagedItems.removeWhere((i) => i.propertyId == propertyId);
   }
 }
