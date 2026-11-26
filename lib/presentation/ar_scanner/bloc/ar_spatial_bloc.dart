@@ -4,9 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/services/ar_spatial_service.dart';
+import '../../../core/services/spatial_archive_export_service.dart';
 import '../../../data/models/ar_measurement_model.dart';
 import '../../../data/models/plane_reconstruction_model.dart';
+import '../../../data/models/spatial_export_model.dart';
+import '../../../data/models/staged_furniture_model.dart';
 import '../../../data/repositories/ar_measurement_repository.dart';
+import '../../../data/repositories/spatial_archive_repository.dart';
 
 // EVENTS
 abstract class ArSpatialEvent {
@@ -70,6 +74,28 @@ class SelectWallPlaneEvent extends ArSpatialEvent {
   const SelectWallPlaneEvent(this.wall);
 }
 
+class ExportRoomArchiveEvent extends ArSpatialEvent {
+  final String propertyId;
+  final String roomName;
+  final SpatialArchiveFormat format;
+  final double ceilingHeightMeters;
+  final List<StagedFurnitureModel> stagedFurniture;
+  final bool openNativeShareOrQuickLook;
+
+  const ExportRoomArchiveEvent({
+    required this.propertyId,
+    required this.roomName,
+    this.format = SpatialArchiveFormat.bundle,
+    this.ceilingHeightMeters = 2.8,
+    this.stagedFurniture = const [],
+    this.openNativeShareOrQuickLook = false,
+  });
+}
+
+class LoadExportedArchivesEvent extends ArSpatialEvent {
+  const LoadExportedArchivesEvent();
+}
+
 // STATE
 class ArSpatialState {
   final bool isSessionActive;
@@ -94,6 +120,9 @@ class ArSpatialState {
   final RoomEnclosureModel? roomEnclosure;
   final WallPlaneModel? selectedWall;
   final List<ArMeasurementModel> savedScans;
+  final bool isExportingArchive;
+  final SpatialExportRecord? lastExportRecord;
+  final List<SpatialExportRecord> exportedArchives;
   final String? message;
 
   const ArSpatialState({
@@ -119,6 +148,9 @@ class ArSpatialState {
     this.roomEnclosure,
     this.selectedWall,
     required this.savedScans,
+    this.isExportingArchive = false,
+    this.lastExportRecord,
+    this.exportedArchives = const [],
     this.message,
   });
 
@@ -146,6 +178,9 @@ class ArSpatialState {
       roomEnclosure: null,
       selectedWall: null,
       savedScans: [],
+      isExportingArchive: false,
+      lastExportRecord: null,
+      exportedArchives: [],
       message: null,
     );
   }
@@ -173,6 +208,9 @@ class ArSpatialState {
     RoomEnclosureModel? roomEnclosure,
     WallPlaneModel? selectedWall,
     List<ArMeasurementModel>? savedScans,
+    bool? isExportingArchive,
+    SpatialExportRecord? lastExportRecord,
+    List<SpatialExportRecord>? exportedArchives,
     String? message,
   }) {
     return ArSpatialState(
@@ -199,6 +237,9 @@ class ArSpatialState {
       roomEnclosure: roomEnclosure ?? this.roomEnclosure,
       selectedWall: selectedWall ?? this.selectedWall,
       savedScans: savedScans ?? this.savedScans,
+      isExportingArchive: isExportingArchive ?? this.isExportingArchive,
+      lastExportRecord: lastExportRecord ?? this.lastExportRecord,
+      exportedArchives: exportedArchives ?? this.exportedArchives,
       message: message,
     );
   }
@@ -208,11 +249,19 @@ class ArSpatialState {
 class ArSpatialBloc extends Bloc<ArSpatialEvent, ArSpatialState> {
   final ArSpatialService _service;
   final ArMeasurementRepository _repository;
+  final SpatialArchiveExportService _exportService;
+  final SpatialArchiveRepository? archiveRepository;
   StreamSubscription<SpatialTelemetryPacket>? _telemetrySub;
   StreamSubscription<DepthPointCloudPacket>? _depthSub;
 
-  ArSpatialBloc(this._service, this._repository)
-    : super(ArSpatialState.initial()) {
+  ArSpatialBloc(
+    this._service,
+    this._repository, {
+    SpatialArchiveExportService? exportService,
+    this.archiveRepository,
+  }) : _exportService =
+           exportService ?? SpatialArchiveExportService(arService: _service),
+       super(ArSpatialState.initial()) {
     on<InitializeArSessionEvent>(_onInitializeArSession);
     on<PlaceCornerAnchorEvent>(_onPlaceCornerAnchor);
     on<ComputeRoomPolygonEvent>(_onComputeRoomPolygon);
@@ -225,6 +274,8 @@ class ArSpatialBloc extends Bloc<ArSpatialEvent, ArSpatialState> {
     on<ToggleRoomEnclosureEvent>(_onToggleRoomEnclosure);
     on<ReconstructRoomEnclosureEvent>(_onReconstructRoomEnclosure);
     on<SelectWallPlaneEvent>(_onSelectWallPlane);
+    on<ExportRoomArchiveEvent>(_onExportRoomArchive);
+    on<LoadExportedArchivesEvent>(_onLoadExportedArchives);
   }
 
   void _onToggleLidarPointCloud(
@@ -336,10 +387,9 @@ class ArSpatialBloc extends Bloc<ArSpatialEvent, ArSpatialState> {
     Emitter<ArSpatialState> emit,
   ) async {
     final updatedAnchors = List<Offset>.from(state.anchors)..add(event.point);
-    await _service.placeCornerAnchor(event.point.dx, event.point.dy, 0.0);
-
-    // Compute wall lengths & polygon
+    // Compute wall lengths & polygon immediately so rapid consecutive taps never drop anchors
     _recomputePolygonAndMetrics(updatedAnchors, emit);
+    await _service.placeCornerAnchor(event.point.dx, event.point.dy, 0.0);
   }
 
   Future<void> _onComputeRoomPolygon(
@@ -497,7 +547,78 @@ class ArSpatialBloc extends Bloc<ArSpatialEvent, ArSpatialState> {
     Emitter<ArSpatialState> emit,
   ) async {
     final scans = await _repository.getMeasurements();
-    emit(state.copyWith(savedScans: scans));
+    final archives = archiveRepository != null
+        ? await archiveRepository!.getExportRecords()
+        : state.exportedArchives;
+    emit(state.copyWith(savedScans: scans, exportedArchives: archives));
+  }
+
+  Future<void> _onLoadExportedArchives(
+    LoadExportedArchivesEvent event,
+    Emitter<ArSpatialState> emit,
+  ) async {
+    if (archiveRepository == null) return;
+    final archives = await archiveRepository!.getExportRecords();
+    emit(state.copyWith(exportedArchives: archives));
+  }
+
+  Future<void> _onExportRoomArchive(
+    ExportRoomArchiveEvent event,
+    Emitter<ArSpatialState> emit,
+  ) async {
+    emit(state.copyWith(isExportingArchive: true));
+    try {
+      final bundle = await _exportService.exportRoomArchive(
+        propertyId: event.propertyId,
+        roomName: event.roomName,
+        viewportAnchors: state.anchors,
+        existingEnclosure: state.roomEnclosure,
+        ceilingHeightMeters: event.ceilingHeightMeters,
+        stagedFurniture: event.stagedFurniture,
+        format: event.format,
+      );
+
+      if (archiveRepository != null) {
+        await archiveRepository!.saveExportRecord(bundle.record);
+      }
+
+      if (event.openNativeShareOrQuickLook) {
+        if (bundle.record.usdzPath != null &&
+            event.format == SpatialArchiveFormat.usdz) {
+          await _exportService.previewUsdzQuickLook(bundle.record.usdzPath!);
+        } else {
+          final paths = <String>[
+            if (bundle.record.glbPath != null) bundle.record.glbPath!,
+            if (bundle.record.usdzPath != null) bundle.record.usdzPath!,
+          ];
+          await _exportService.shareSpatialArchive(
+            filePaths: paths,
+            title: '${event.roomName} 3D Archive',
+          );
+        }
+      }
+
+      final updatedArchives = archiveRepository != null
+          ? await archiveRepository!.getExportRecords()
+          : [bundle.record, ...state.exportedArchives];
+
+      emit(
+        state.copyWith(
+          isExportingArchive: false,
+          lastExportRecord: bundle.record,
+          exportedArchives: updatedArchives,
+          message:
+              'Exported ${event.roomName} (${bundle.record.vertexCount} vertices, ${bundle.record.triangleCount} triangles)',
+        ),
+      );
+    } catch (e) {
+      emit(
+        state.copyWith(
+          isExportingArchive: false,
+          message: 'Failed to export 3D archive: $e',
+        ),
+      );
+    }
   }
 
   @override

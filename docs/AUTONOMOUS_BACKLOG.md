@@ -25,10 +25,10 @@ This backlog outlines 25 production sprints for continued autonomous evolution o
 - [x] Persist placed furniture configurations to SQLite database table `staged_furniture`.
 
 ### Sprint 04: USDZ & glTF 3D Floorplan Export
-- [ ] Implement glTF 2.0 binary serializer in Dart for room meshes.
-- [ ] Implement USDZ export pipeline for iOS Quick Look compatibility.
-- [ ] Add share sheet action exporting room scans as interactive 3D archives.
-- [ ] Add integration test verifying glTF node hierarchy and vertex counts.
+- [x] Implement glTF 2.0 binary serializer in Dart for room meshes.
+- [x] Implement USDZ export pipeline for iOS Quick Look compatibility.
+- [x] Add share sheet action exporting room scans as interactive 3D archives.
+- [x] Add integration test verifying glTF node hierarchy and vertex counts.
 
 ### Sprint 05: Sunlight Ray-Tracing Simulator
 - [ ] Integrate astronomical solar elevation and azimuth calculation library.

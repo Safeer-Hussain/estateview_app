@@ -7,10 +7,12 @@ import 'package:estate_view_app/data/models/property_model.dart';
 import 'package:estate_view_app/data/models/tour_booking_model.dart';
 import 'package:estate_view_app/data/models/ar_measurement_model.dart';
 import 'package:estate_view_app/data/models/staged_furniture_model.dart';
+import 'package:estate_view_app/data/models/spatial_export_model.dart';
 import 'package:estate_view_app/data/repositories/property_repository.dart';
 import 'package:estate_view_app/data/repositories/tour_repository.dart';
 import 'package:estate_view_app/data/repositories/ar_measurement_repository.dart';
 import 'package:estate_view_app/data/repositories/staged_furniture_repository.dart';
+import 'package:estate_view_app/data/repositories/spatial_archive_repository.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockAppDatabase extends Mock implements AppDatabase {
@@ -287,5 +289,25 @@ class MockStagedFurnitureRepository implements StagedFurnitureRepository {
   @override
   Future<void> clearStagedFurniture(String propertyId) async {
     stagedItems.removeWhere((i) => i.propertyId == propertyId);
+  }
+}
+
+class MockSpatialArchiveRepository implements SpatialArchiveRepository {
+  List<SpatialExportRecord> records = [];
+
+  @override
+  Future<void> saveExportRecord(SpatialExportRecord record) async {
+    records.removeWhere((r) => r.id == record.id);
+    records.insert(0, record);
+  }
+
+  @override
+  Future<List<SpatialExportRecord>> getExportRecords({
+    String? propertyId,
+  }) async {
+    if (propertyId != null && propertyId.isNotEmpty) {
+      return records.where((r) => r.propertyId == propertyId).toList();
+    }
+    return List.unmodifiable(records);
   }
 }

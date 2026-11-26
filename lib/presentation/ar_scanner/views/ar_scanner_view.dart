@@ -11,6 +11,7 @@ import '../widgets/furniture_staging_canvas.dart';
 import '../widgets/point_cloud_visualizer.dart';
 import '../widgets/room_enclosure_visualizer.dart';
 import '../widgets/solar_azimuth_gauge.dart';
+import '../widgets/spatial_archive_share_sheet.dart';
 import '../widgets/spatial_viewport_canvas.dart';
 
 class ArScannerView extends StatefulWidget {
@@ -56,6 +57,25 @@ class _ArScannerViewState extends State<ArScannerView> {
           'Staged ${preset.name} on room floorplan.',
         );
       },
+    );
+  }
+
+  void _openArchiveShareSheet(BuildContext context, ArSpatialState state) {
+    final stagingItems = context
+        .read<FurnitureStagingCubit>()
+        .state
+        .placedItems;
+    final roomName = _roomNameController.text.trim().isEmpty
+        ? 'Master Bedroom Suite'
+        : _roomNameController.text.trim();
+
+    SpatialArchiveShareSheet.show(
+      context,
+      propertyId: _selectedPropertyId,
+      roomName: roomName,
+      anchors: state.anchors,
+      existingEnclosure: state.roomEnclosure,
+      stagedFurniture: stagingItems,
     );
   }
 
@@ -558,6 +578,15 @@ class _ArScannerViewState extends State<ArScannerView> {
         ],
         if (state.anchors.length >= 3) ...[
           FloatingActionButton.small(
+            heroTag: AppConstants.fabArExport3dArchive,
+            backgroundColor: colors.tertiaryContainer,
+            foregroundColor: colors.onTertiaryContainer,
+            tooltip: 'Export 3D (.GLB / .USDZ)',
+            onPressed: () => _openArchiveShareSheet(context, state),
+            child: const Icon(Icons.archive_outlined, size: 20),
+          ),
+          const SizedBox(width: 10),
+          FloatingActionButton.small(
             heroTag: AppConstants.fabArSaveScan,
             backgroundColor: colors.secondary,
             foregroundColor: colors.onSecondary,
@@ -625,6 +654,15 @@ class _ArScannerViewState extends State<ArScannerView> {
               ),
               const SizedBox(width: 10),
             ],
+            FloatingActionButton.small(
+              heroTag: AppConstants.fabArExport3dArchive,
+              backgroundColor: colors.tertiaryContainer,
+              foregroundColor: colors.onTertiaryContainer,
+              tooltip: 'Export 3D (.GLB / .USDZ)',
+              onPressed: () => _openArchiveShareSheet(context, state),
+              child: const Icon(Icons.archive_outlined, size: 20),
+            ),
+            const SizedBox(width: 10),
             FloatingActionButton.extended(
               heroTag: AppConstants.fabArStageFurniture,
               backgroundColor: colors.primary,
@@ -821,6 +859,14 @@ class _ArScannerViewState extends State<ArScannerView> {
               ),
             ],
           ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: state.anchors.length >= 3
+                ? () => _openArchiveShareSheet(context, state)
+                : null,
+            icon: const Icon(Icons.archive_outlined, size: 16),
+            label: const Text('Export 3D (.GLB / .USDZ)'),
+          ),
         ],
       ),
     );
@@ -885,6 +931,12 @@ class _ArScannerViewState extends State<ArScannerView> {
                 onPressed: () => _openFurnitureCatalog(context, state.anchors),
                 icon: const Icon(Icons.chair_outlined, size: 16),
                 label: const Text('Stage Furniture'),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: () => _openArchiveShareSheet(context, state),
+                icon: const Icon(Icons.archive_outlined, size: 16),
+                label: const Text('Export 3D (.GLB / .USDZ)'),
               ),
             ],
           ),

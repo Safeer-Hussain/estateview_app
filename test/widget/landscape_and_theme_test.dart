@@ -147,6 +147,7 @@ void main() {
 
         expect(find.text('Export Property Dossier'), findsOneWidget);
         expect(find.text('Copy Formatted Brief to Clipboard'), findsOneWidget);
+        expect(find.text('Export 3D Blueprint (.GLB / .USDZ)'), findsOneWidget);
       },
     );
   });

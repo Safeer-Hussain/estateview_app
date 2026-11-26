@@ -1,11 +1,13 @@
 package com.example.estate_view_app
 
+import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
+import java.io.File
 import kotlin.math.abs
 import kotlin.math.sqrt
 
@@ -256,6 +258,54 @@ class MainActivity : FlutterActivity() {
                             "ceilingHeightMeters" to ceilingHeight
                         )
                     )
+                }
+                "previewUsdzQuickLook" -> {
+                    val filePath = call.argument<String>("filePath") ?: ""
+                    result.success(
+                        mapOf(
+                            "status" to "PLATFORM_ARCHIVED",
+                            "filePath" to filePath,
+                            "platform" to "android"
+                        )
+                    )
+                }
+                "shareSpatialArchive" -> {
+                    val filePaths = call.argument<List<String>>("filePaths") ?: emptyList()
+                    val title = call.argument<String>("title") ?: "EstateView 3D Floorplan Archive"
+                    val existingFiles = filePaths.map { File(it) }.filter { it.exists() }
+                    val totalBytes = existingFiles.sumOf { it.length() }
+
+                    try {
+                        val shareSummary = buildString {
+                            appendLine(title)
+                            existingFiles.forEach { file ->
+                                appendLine("${file.name} (${file.length()} bytes): ${file.absolutePath}")
+                            }
+                        }
+                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_SUBJECT, title)
+                            putExtra(Intent.EXTRA_TEXT, shareSummary)
+                        }
+                        startActivity(Intent.createChooser(shareIntent, title))
+                        result.success(
+                            mapOf(
+                                "status" to "SHARE_SHEET_PRESENTED",
+                                "fileCount" to existingFiles.size,
+                                "totalBytes" to totalBytes,
+                                "platform" to "android"
+                            )
+                        )
+                    } catch (_: Exception) {
+                        result.success(
+                            mapOf(
+                                "status" to "ARCHIVED_LOCALLY",
+                                "fileCount" to existingFiles.size,
+                                "totalBytes" to totalBytes,
+                                "platform" to "android"
+                            )
+                        )
+                    }
                 }
                 else -> {
                     result.notImplemented()

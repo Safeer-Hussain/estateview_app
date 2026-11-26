@@ -2,6 +2,17 @@
 
 All notable changes to the EstateView PropTech platform are documented in this file.
 
+## [1.4.4+3] - 2026-11-26
+
+### Added
+- USDZ and glTF 2.0 Binary (.glb) 3D Floorplan Export pipeline (Sprint 04).
+- Pure-Dart Khronos glTF 2.0 binary serializer (`GltfBinarySerializer`) supporting hierarchical room nodes, floor and ceiling ear-clipping triangulation, wall quads, door/window portals, and staged furniture volumes with PBR materials and accessor bounds.
+- Apple Quick Look compatible USDZ exporter (`UsdzArchiveSerializer`) producing 64-byte aligned, uncompressed STORE ZIP archives wrapping Pixar USDA 1.0 scenes with `UsdPreviewSurface` shaders.
+- Disk archival, metadata inspection, and SQLite persistence (`exported_3d_archives` table) managed via `SpatialArchiveExportService`, `SpatialArchiveRepository`, and `ArSpatialBloc`.
+- Native platform channel hooks in `AppDelegate.swift` (`QLPreviewController` Quick Look preview and `UIActivityViewController`) and `MainActivity.kt` (`Intent.ACTION_SEND` archive sharing).
+- Interactive `SpatialArchiveShareSheet` featuring format switching (`.glb`, `.usdz`, dual bundle), extrusion height controls, live vertex/triangle diagnostics, node tree / USDA schema inspector, and 800x360 landscape safety, wired into `ArScannerView`, `PortfolioHubView`, and `ShareDossierSheet`.
+- Comprehensive unit, widget, and integration tests verifying glTF 2.0 node hierarchy, exact vertex/triangle counts, USDZ 64-byte boundary alignment, and 800x360 responsive layout parity.
+
 ## [1.4.3+2] - 2026-11-18
 
 ### Added

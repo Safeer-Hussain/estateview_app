@@ -12,6 +12,7 @@ import '../../data/models/tour_booking_model.dart';
 import '../../data/models/ar_measurement_model.dart';
 import '../../data/models/ai_message_model.dart';
 import '../../data/models/staged_furniture_model.dart';
+import '../../data/models/spatial_export_model.dart';
 import '../constants/app_constants.dart';
 
 class AppDatabase {
@@ -109,6 +110,25 @@ class AppDatabase {
     ''');
 
     await _ensureStagedFurnitureTable(db);
+    await _ensureExportedArchivesTable(db);
+  }
+
+  Future<void> _ensureExportedArchivesTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS exported_3d_archives (
+        id TEXT PRIMARY KEY,
+        property_id TEXT NOT NULL,
+        room_name TEXT NOT NULL,
+        format TEXT NOT NULL,
+        glb_path TEXT,
+        usdz_path TEXT,
+        vertex_count INTEGER NOT NULL,
+        triangle_count INTEGER NOT NULL,
+        node_count INTEGER NOT NULL,
+        total_bytes INTEGER NOT NULL,
+        created_at INTEGER NOT NULL
+      )
+    ''');
   }
 
   Future<void> _ensureStagedFurnitureTable(Database db) async {
@@ -291,6 +311,41 @@ class AppDatabase {
       where: 'property_id = ?',
       whereArgs: [propertyId],
     );
+  }
+
+  // --- EXPORTED 3D ARCHIVE QUERIES ---
+  Future<int> insertExportRecord(SpatialExportRecord record) async {
+    final db = await database;
+    await _ensureExportedArchivesTable(db);
+    return await db.insert(
+      'exported_3d_archives',
+      record.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<SpatialExportRecord>> getAllExportRecords() async {
+    final db = await database;
+    await _ensureExportedArchivesTable(db);
+    final maps = await db.query(
+      'exported_3d_archives',
+      orderBy: 'created_at DESC',
+    );
+    return maps.map((m) => SpatialExportRecord.fromMap(m)).toList();
+  }
+
+  Future<List<SpatialExportRecord>> getExportRecordsByPropertyId(
+    String propertyId,
+  ) async {
+    final db = await database;
+    await _ensureExportedArchivesTable(db);
+    final maps = await db.query(
+      'exported_3d_archives',
+      where: 'property_id = ?',
+      whereArgs: [propertyId],
+      orderBy: 'created_at DESC',
+    );
+    return maps.map((m) => SpatialExportRecord.fromMap(m)).toList();
   }
 
   // --- SEED DATA (22 PROPERTIES ACROSS DHA LAHORE, GULBERG, BAHRIA & GLOBAL HUBS) ---

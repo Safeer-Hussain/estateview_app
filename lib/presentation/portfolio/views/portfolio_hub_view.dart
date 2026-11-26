@@ -4,10 +4,14 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/services/preferences_service.dart';
 import '../../ar_scanner/bloc/ar_spatial_bloc.dart';
+import '../../ar_scanner/widgets/spatial_archive_share_sheet.dart';
 import '../../discovery/bloc/property_catalog_bloc.dart';
 import '../../discovery/views/property_detail_view.dart';
 import '../../discovery/widgets/property_card.dart';
+import '../../../data/models/ar_measurement_model.dart';
+import '../../../data/models/staged_furniture_model.dart';
 import '../../../data/models/tour_booking_model.dart';
+import '../../../data/repositories/staged_furniture_repository.dart';
 import '../../../data/repositories/tour_repository.dart';
 
 class PortfolioHubView extends StatefulWidget {
@@ -304,7 +308,7 @@ class _PortfolioHubViewState extends State<PortfolioHubView>
   Widget _buildScanCard(
     BuildContext context,
     ColorScheme colors,
-    dynamic scan,
+    ArMeasurementModel scan,
   ) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -320,12 +324,15 @@ class _PortfolioHubViewState extends State<PortfolioHubView>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                scan.roomName,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: colors.onSurface,
+              Expanded(
+                child: Text(
+                  scan.roomName,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: colors.onSurface,
+                  ),
                 ),
               ),
               Container(
@@ -371,6 +378,32 @@ class _PortfolioHubViewState extends State<PortfolioHubView>
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () async {
+                final furniture = sl.isRegistered<StagedFurnitureRepository>()
+                    ? await sl<StagedFurnitureRepository>().getStagedFurniture(
+                        scan.propertyId,
+                      )
+                    : const <StagedFurnitureModel>[];
+                if (!context.mounted) return;
+                SpatialArchiveShareSheet.show(
+                  context,
+                  propertyId: scan.propertyId,
+                  roomName: scan.roomName,
+                  anchors: scan.points,
+                  stagedFurniture: furniture,
+                );
+              },
+              icon: const Icon(Icons.archive_outlined, size: 16),
+              label: const Text(
+                'Export Interactive 3D Archive (.GLB / .USDZ)',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+            ),
           ),
         ],
       ),

@@ -254,6 +254,14 @@ class ArSpatialService {
       // Fallback mathematical reconstruction
     }
 
+    return reconstructWallPlanesSync(anchors, ceilingHeight: ceilingHeight);
+  }
+
+  /// Pure-Dart geometric wall plane reconstruction shared by live AR fallback and instant 3D preview.
+  RoomEnclosureModel reconstructWallPlanesSync(
+    List<Map<String, double>> anchors, {
+    double ceilingHeight = 2.8,
+  }) {
     final n = anchors.length;
     if (n < 3) {
       return RoomEnclosureModel(

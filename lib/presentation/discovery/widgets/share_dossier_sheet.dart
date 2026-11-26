@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../core/utils/app_feedback.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../data/models/property_model.dart';
+import '../../ar_scanner/widgets/spatial_archive_share_sheet.dart';
 
 class ShareDossierSheet extends StatelessWidget {
   final PropertyModel property;
@@ -190,6 +191,33 @@ https://estateview.internal/property/${property.id}
                 },
                 icon: const Icon(Icons.download_outlined, size: 18),
                 label: const Text('Export Investment Summary (PDF/JSON)'),
+              ),
+              const SizedBox(height: 8),
+
+              OutlinedButton.icon(
+                onPressed: () {
+                  final primaryRoom = property.floorplan.rooms.isNotEmpty
+                      ? property.floorplan.rooms.first
+                      : null;
+                  final widthMeters = (primaryRoom?.widthFt ?? 20.0) * 0.3048;
+                  final depthMeters = (primaryRoom?.lengthFt ?? 15.0) * 0.3048;
+                  final meterAnchors = [
+                    const Offset(0.0, 0.0),
+                    Offset(widthMeters, 0.0),
+                    Offset(widthMeters, depthMeters),
+                    Offset(0.0, depthMeters),
+                  ];
+                  Navigator.of(context).pop();
+                  SpatialArchiveShareSheet.show(
+                    context,
+                    propertyId: property.id,
+                    roomName: '${property.title} Blueprint',
+                    anchors: meterAnchors,
+                    anchorsAlreadyInMeters: true,
+                  );
+                },
+                icon: const Icon(Icons.archive_outlined, size: 18),
+                label: const Text('Export 3D Blueprint (.GLB / .USDZ)'),
               ),
               const SizedBox(height: 8),
             ],

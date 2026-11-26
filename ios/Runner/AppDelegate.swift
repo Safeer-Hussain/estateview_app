@@ -1,8 +1,9 @@
 import Flutter
+import QuickLook
 import UIKit
 
 @main
-@objc class AppDelegate: FlutterAppDelegate, FlutterStreamHandler {
+@objc class AppDelegate: FlutterAppDelegate, FlutterStreamHandler, QLPreviewControllerDataSource {
   private let methodChannelName = "com.safeer.estateview/ar_spatial"
   private let eventChannelName = "com.safeer.estateview/spatial_telemetry"
 
@@ -10,6 +11,7 @@ import UIKit
   private var telemetryTimer: Timer?
   private var telemetryStep: Int = 0
   private var eventSink: FlutterEventSink?
+  private var quickLookFileUrl: URL?
 
   override func application(
     _ application: UIApplication,
@@ -232,6 +234,68 @@ import UIKit
           "ceilingHeightMeters": ceilingHeight
         ])
 
+      case "previewUsdzQuickLook":
+        let args = call.arguments as? [String: Any]
+        let filePath = args?["filePath"] as? String ?? ""
+        let fileUrl = URL(fileURLWithPath: filePath)
+        guard !filePath.isEmpty, FileManager.default.fileExists(atPath: filePath) else {
+          result([
+            "status": "FILE_NOT_FOUND",
+            "filePath": filePath
+          ])
+          return
+        }
+        guard QLPreviewController.canPreview(fileUrl as QLPreviewItem) else {
+          result([
+            "status": "PREVIEW_UNSUPPORTED",
+            "filePath": filePath
+          ])
+          return
+        }
+        self.quickLookFileUrl = fileUrl
+        DispatchQueue.main.async {
+          let previewController = QLPreviewController()
+          previewController.dataSource = self
+          controller.present(previewController, animated: true, completion: nil)
+        }
+        result([
+          "status": "QUICKLOOK_PRESENTED",
+          "filePath": filePath,
+          "platform": "ios"
+        ])
+
+      case "shareSpatialArchive":
+        let args = call.arguments as? [String: Any]
+        let filePaths = args?["filePaths"] as? [String] ?? []
+        let urls = filePaths
+          .filter { !$0.isEmpty && FileManager.default.fileExists(atPath: $0) }
+          .map { URL(fileURLWithPath: $0) }
+        guard !urls.isEmpty else {
+          result([
+            "status": "NO_ARCHIVE_FILES",
+            "filePaths": filePaths
+          ])
+          return
+        }
+        DispatchQueue.main.async {
+          let activityVC = UIActivityViewController(activityItems: urls, applicationActivities: nil)
+          if let popover = activityVC.popoverPresentationController {
+            popover.sourceView = controller.view
+            popover.sourceRect = CGRect(
+              x: controller.view.bounds.midX,
+              y: controller.view.bounds.midY,
+              width: 1,
+              height: 1
+            )
+          }
+          controller.present(activityVC, animated: true, completion: nil)
+        }
+        result([
+          "status": "SHARE_SHEET_PRESENTED",
+          "fileCount": urls.count,
+          "platform": "ios"
+        ])
+
       default:
         result(FlutterMethodNotImplemented)
       }
@@ -277,6 +341,14 @@ import UIKit
     self.telemetryTimer = nil
     self.eventSink = nil
     return nil
+  }
+
+  public func numberOfPreviewItems(in controller: QLPreviewController) -> Int {
+    return quickLookFileUrl != nil ? 1 : 0
+  }
+
+  public func previewController(_ controller: QLPreviewController, previewItemAt index: Int) -> QLPreviewItem {
+    return (quickLookFileUrl ?? URL(fileURLWithPath: "")) as QLPreviewItem
   }
 }
 
